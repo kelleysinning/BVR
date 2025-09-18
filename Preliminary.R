@@ -364,8 +364,8 @@ ggplot(velocity_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
 
 vbins <- velocity_long %>%
   mutate(velocity_bin = cut(Velocity,
-                            breaks = c(0, 0.1, 0.2, 0.3, 0.4, 0.6, 1, Inf),
-                            labels = c("0–0.1", "0.1–0.2", "0.2–0.3", 
+                            breaks = c(0, 0.2, 0.3, 0.4, 0.6, 1, Inf),
+                            labels = c("0–0.2", "0.2–0.3", 
                                        "0.3–0.4", "0.4–0.6", "0.6–1", "Above 1")))
 
 vbins <- velocity_long %>%
@@ -415,4 +415,51 @@ diatoms<- vbins %>%
   group_by(velocity_bin) 
 
 kruskal.test(Concentration ~ velocity_bin, data = diatoms_filtered) # not significant
+
+
+
+
+
+# Not looking at averages, trying to do one box per site and per sampling---------
+
+velocity_long <- didymo_benthotorch_velocity %>%
+  pivot_longer(
+    cols = c(Cyano, Green, Diatoms),   # the algae columns
+    names_to = "Algae_Type",
+    values_to = "Concentration"
+  )
+
+library(dplyr)
+library(lubridate)
+
+velocity_long <- velocity_long %>%
+  mutate(Month_Year = format(Sampling_date, "%Y-%m"))
+
+
+# Ordering things how I like
+velocity_long$Algae_Type <- factor(velocity_long$Algae_Type, levels = c("Green", "Cyano", "Diatoms"))
+
+
+# Algae response to velocity at each site
+ggplot(velocity_long, aes(x = Velocity, y = Concentration, color = Algae_Type)) +
+  geom_point(size = 3, alpha = 0.8) +
+  geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +
+  facet_wrap(~Site + Month_Year, scales = "free") +
+  labs(
+    x = "Velocity",
+    y = "Algae Concentration",
+    color = "Algae Type",
+    shape = "Site"
+  ) +
+  scale_colour_manual(
+    values = c("Green" = "#70A494", "Cyano" = "#DE8A5A", "Diatoms" = "#2887A1"), 
+    name = "Algae Type") + 
+  theme_bw(base_size = 14) +
+  theme(
+    legend.position = "top",
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_blank()
+  )
+
+
 
