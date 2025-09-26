@@ -251,13 +251,13 @@ avg_didymo_benthotorch_velocity <- didymo_benthotorch_velocity %>%
   group_by(Sampling_date, Site, Sample.Type) %>%
   summarise(
     across(c(Cyano, Green, Diatoms, Chlorophyll.A, Velocity, mean_30d, cv_30d), 
-           \(x) mean(x, na.rm = TRUE)),   # modern dplyr style
+           \(x) mean(x, na.rm = TRUE)),  
     Replicate_number = n(),   # how many replicates went into the average
     .groups = "drop"
   )
 
 
-velocity_long <- avg_didymo_benthotorch_velocity %>%
+velocity_long_avg <- avg_didymo_benthotorch_velocity %>%
   pivot_longer(
     cols = c(Cyano, Green, Diatoms),   # the algae columns
     names_to = "Algae_Type",
@@ -265,13 +265,13 @@ velocity_long <- avg_didymo_benthotorch_velocity %>%
   )
 
 # Ordering things how I like
-velocity_long$Algae_Type <- factor(velocity_long$Algae_Type, levels = c("Green", "Cyano", "Diatoms"))
+velocity_long_avg$Algae_Type <- factor(velocity_long_avg$Algae_Type, levels = c("Green", "Cyano", "Diatoms"))
 
 
 # Plotting
 
 # Algae over time for each site
-ggplot(velocity_long, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
+ggplot(velocity_long_avg, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
   geom_point(size = 3, alpha = 0.8) +
   geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +  # one line per algae type
   facet_wrap(~Site) +
@@ -291,7 +291,7 @@ ggplot(velocity_long, aes(x = Sampling_date, y = Concentration, color = Algae_Ty
   )
 
 # SAA with velocity fun
-ggplot(velocity_long, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
+ggplot(velocity_long_avg, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
   geom_point(aes(size = Velocity, alpha = 0.7)) +  # size represents mean Velocity
   geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +  
   facet_wrap(~Site) +
@@ -311,7 +311,7 @@ ggplot(velocity_long, aes(x = Sampling_date, y = Concentration, color = Algae_Ty
   )
 
 # Algae response to velocity at each site
-ggplot(velocity_long, aes(x = Velocity, y = Concentration, color = Algae_Type)) +
+ggplot(velocity_long_avg, aes(x = Velocity, y = Concentration, color = Algae_Type)) +
   geom_point(size = 3, alpha = 0.8) +
   geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +
   facet_wrap(~Site, scales = "free") +
@@ -333,7 +333,7 @@ ggplot(velocity_long, aes(x = Velocity, y = Concentration, color = Algae_Type)) 
 
 
 # Algae at each site with boxplots
-ggplot(velocity_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
+ggplot(velocity_long_avg, aes(x = Site, y = Concentration, fill = Algae_Type)) +
   geom_boxplot(position = position_dodge(width = 0.8)) +  # side-by-side boxes per site
   labs(
     x = "Site",
@@ -350,25 +350,18 @@ ggplot(velocity_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
   )
 
 
-# Boxplots across velocity...first have to make velocity categorical
+# Boxplots across velocity...first have to make velocity categorical-------
 
-# To look at boxplots before algae was averaged across replicates run this # code below
-# and switch out algae_long for nonavg_algae_long
+# This is still for averaged replicates, use velocity_long below to see non avg
 
-# nonavg_algae_long <- didymo_benthotorch %>%
-# pivot_longer(
-#  cols = c(Cyano, Green, Diatoms),   # the algae columns
-#  names_to = "Algae_Type",
-# values_to = "Concentration"
-# )
 
-vbins <- velocity_long %>%
+vbins <- velocity_long_avg %>%
   mutate(velocity_bin = cut(Velocity,
                             breaks = c(0, 0.2, 0.3, 0.4, 0.6, 1, Inf),
                             labels = c("0–0.2", "0.2–0.3", 
                                        "0.3–0.4", "0.4–0.6", "0.6–1", "Above 1")))
 
-vbins <- velocity_long %>%
+vbins <- velocity_long_avg %>%
   mutate(velocity_bin = cut(Velocity,
                             breaks = c(0, 0.2,  0.4, 0.6, 1, Inf),
                             labels = c("0–0.2", "0.2–0.4", "0.4–0.6", 
@@ -427,7 +420,7 @@ velocity_long <- didymo_benthotorch_velocity %>%
     cols = c(Cyano, Green, Diatoms),   # the algae columns
     names_to = "Algae_Type",
     values_to = "Concentration"
-  )
+  ) # This is what we want to use
 
 library(dplyr)
 library(lubridate)
@@ -441,25 +434,110 @@ velocity_long$Algae_Type <- factor(velocity_long$Algae_Type, levels = c("Green",
 
 
 # Algae response to velocity at each site
-ggplot(velocity_long, aes(x = Velocity, y = Concentration, color = Algae_Type)) +
-  geom_point(size = 3, alpha = 0.8) +
-  geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +
-  facet_wrap(~Site + Month_Year, scales = "free") +
+
+library(tidyverse)
+library(purrr)
+
+
+velocity_long %>%
+  group_split(Site) %>%
+  walk(~ {
+    site_name <- unique(.x$Site)
+    
+    site_velocity <- ggplot(.x, aes(x = Velocity, y = Concentration, color = Algae_Type)) +
+      geom_point(size = 3, alpha = 0.8) +
+      geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +
+      facet_wrap(~Month_Year, scales = "free") +   # only facet by time within site
+      labs(
+        x = "Velocity",
+        y = "Algae Concentration",
+        color = "Algae Type",
+        title = paste("Site:", site_name)
+      ) +
+      scale_colour_manual(
+        values = c("Green" = "#70A494", "Cyano" = "#DE8A5A", "Diatoms" = "#2887A1"),
+        name = "Algae Type"
+      ) +
+      theme_bw(base_size = 14) +
+      theme(
+        legend.position = "top",
+        panel.grid.major = element_line(color = "grey90"),
+        panel.grid.minor = element_blank()
+      )
+    
+    print(site_velocity)  # shows the plot
+    
+  })
+
+
+
+
+# Algae at each site with boxplots
+# This goes with algae x sites below
+ggplot(velocity_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
+  geom_boxplot(position = position_dodge(width = 0.8)) +  # side-by-side boxes per site
   labs(
-    x = "Velocity",
+    x = "Site",
     y = "Algae Concentration",
-    color = "Algae Type",
-    shape = "Site"
+    fill = "Algae Type"
   ) +
-  scale_colour_manual(
+  scale_fill_manual(
     values = c("Green" = "#70A494", "Cyano" = "#DE8A5A", "Diatoms" = "#2887A1"), 
     name = "Algae Type") + 
-  theme_bw(base_size = 14) +
+  theme_bw() +
   theme(
-    legend.position = "top",
-    panel.grid.major = element_line(color = "grey90"),
-    panel.grid.minor = element_blank()
+    axis.text.x = element_text(angle = 45, hjust = 1),  # tilt x labels if many sites
+    legend.position = "top"
   )
 
 
+# Playing with stats--------------------------------------
+# Not normal
+shapiro.test(velocity_long$Concentration)
 
+
+sites_x_algae <- velocity_long %>%
+  group_by(Site) %>%
+  rstatix::wilcox_test(Concentration ~ Algae_Type)
+sites_x_algae # comparing algae type differences within sites
+
+algae_x_sites <- velocity_long %>%
+  group_by(Algae_Type) %>%
+  rstatix::wilcox_test(Concentration ~ Site)
+algae_x_sites # comparing algae type differences between sites
+
+
+
+
+
+install.packages("lme4")      # for fitting mixed-effects models
+install.packages("lmerTest")  # adds p-values and tests for lme4 models
+library(lme4)
+library(lmerTest)
+
+model <- lmer(Concentration ~ Velocity * Algae_Type + (1|Site) + (1|Month_Year),
+              data = velocity_long)
+
+summary(model)
+anova(model)
+
+
+
+# just diatoms
+
+diatoms <- velocity_long %>%
+  filter(Algae_Type == "Diatoms")
+
+model <- lmer(Concentration ~ Velocity  + (1|Site) + (1|Month_Year),
+              data = diatoms)
+
+summary(model)
+anova(model)
+
+
+
+model <- lmer(Concentration ~ mean_30d  + (1|Site) + (1|Month_Year),
+              data = diatoms)
+
+summary(model)
+anova(model)
