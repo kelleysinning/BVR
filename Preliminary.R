@@ -609,4 +609,6 @@ head(MassWin[[1]]$Dataset)
 MassWin[[1]]$BestModel
 MassOutput <- MassWin[[1]]$Dataset
 
-plotdelta(dataset = MassOutput) #Red shows strong regions
+plotdelta(dataset = MassOutput) #Red shows strong regions/windows
+plotweights(dataset = MassOutput)
+plotbetas(dataset = MassOutput)
