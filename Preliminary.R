@@ -1,4 +1,14 @@
 # Code for Kelley Sinning Ph.D.
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(tidyverse)
+library(purrr)
+
+
+# RETRIEVING USGS GAUGE DATA
 install.packages("dataRetrieval", type = "source")
 library(dataRetrieval)
 packageVersion("dataRetrieval")  # should be >= 2.7.19
@@ -21,12 +31,12 @@ discharge_data <- read_waterdata_daily(
 )
 
 
-# So using readNWISdv
+# So using readNWISdv...it's older but works
 site <- "09057500"          # USGS site number
 parameterCd <- "00060"      # Discharge (cfs)
 statCd <- "00003"           # Daily mean
-startDate <- "2022-12-01"
-endDate <- "2025-08-31"
+startDate <- "2022-10-01"
+endDate <- "2025-09-29"
 
 # Retrieve daily values
 discharge_data <- readNWISdv(
@@ -39,15 +49,14 @@ discharge_data <- readNWISdv(
 
 # Renaming columns
 
-library(dplyr)
-
 discharge_data <- discharge_data %>%
   rename(Discharge_cfs = X_00060_00003,
          Qualifier = X_00060_00003_cd
   )
  # A, P = data qualifiers (approved, provisional) for Qualifier
 
-# Now, bringing in my algae data -----------------------------------------------
+# BRINGING IN ALGAE DATA-------------------------------------------------------
+# to merge with discharge
 setwd("/Users/kelleysinning/Library/CloudStorage/OneDrive-Colostate/Data/BVR")
 didymo_benthotorch <- read.csv("ALL_bentho_core.csv")
 didymo_benthotorch <- didymo_benthotorch %>%
@@ -63,8 +72,6 @@ didymo_benthotorch <- didymo_benthotorch %>%
   mutate(across(c(Cyano, Green, Diatoms, Chlorophyll.A, Velocity),
                 as.numeric))
 
-
-library(lubridate)
 
 # Function to compute 30-day stats for each sample
 get_30day_stats <- function(Sampling_date, discharge_data) {
@@ -103,10 +110,6 @@ avg_didymo_benthotorch <- didymo_benthotorch %>%
   )
 
 
-
-library(ggplot2)
-library(dplyr)
-library(tidyr)
 
 # Pivot your algae columns to long format
 
@@ -238,12 +241,13 @@ ggplot(bins, aes(x = discharge_bin, y = Concentration, fill = Algae_Type)) +
     legend.position = "top"
   )
 
-# Now, just want to look at velocity relationships-------------------------------
+# VELOCITY RELATIONSHIPS WITH AVERAGED REPS--------------------------------------
 
 #Filtering just for data with velocity
 didymo_benthotorch_velocity <- didymo_benthotorch %>%
   filter(!is.na(Velocity)) 
 
+# This is for when replicates were avergaed
 avg_didymo_benthotorch_velocity <- didymo_benthotorch_velocity %>%
   select(Sampling_date, Site, Sample.Type,  
          Cyano, Green, Diatoms, Chlorophyll.A, Velocity,
@@ -255,7 +259,6 @@ avg_didymo_benthotorch_velocity <- didymo_benthotorch_velocity %>%
     Replicate_number = n(),   # how many replicates went into the average
     .groups = "drop"
   )
-
 
 velocity_long_avg <- avg_didymo_benthotorch_velocity %>%
   pivot_longer(
@@ -353,7 +356,7 @@ ggplot(velocity_long_avg, aes(x = Site, y = Concentration, fill = Algae_Type)) +
 # Boxplots across velocity...first have to make velocity categorical-------
 
 # This is still for averaged replicates, use velocity_long below to see non avg
-
+# playing around with different blocks
 
 vbins <- velocity_long_avg %>%
   mutate(velocity_bin = cut(Velocity,
@@ -367,7 +370,13 @@ vbins <- velocity_long_avg %>%
                             labels = c("0–0.2", "0.2–0.4", "0.4–0.6", 
                                        "0.6–0.1", "Above 1")))
 
-
+# this is for unaveraged, raw data for diatoms only
+vbins <- diatoms %>%
+  filter(Velocity >= 0) %>%   # removes negative velocities
+  mutate(velocity_bin = cut(Velocity,
+                            breaks = c(-Inf, 0.2, 0.3, 0.4, 0.6, 1, Inf),
+                            labels = c("0–0.2", "0.2–0.3", 
+                                       "0.3–0.4", "0.4–0.6", "0.6–1", "Above 1")))
 
 ggplot(vbins, aes(x = velocity_bin, y = Concentration, fill = Algae_Type)) +
   geom_boxplot(position = position_dodge(width = 0.8)) +  # side-by-side boxes per site
@@ -399,21 +408,11 @@ wilcox_test <- vbins %>%
   wilcox_test(Concentration ~ Algae_Type)
 
 
-# Comparing across bins
-
-
-# Kruskal-Wallis
-diatoms<- vbins %>%
-  filter(Algae_Type == "Diatoms")%>%
-  group_by(velocity_bin) 
-
-kruskal.test(Concentration ~ velocity_bin, data = diatoms_filtered) # not significant
 
 
 
-
-
-# Not looking at averages, trying to do one box per site and per sampling---------
+# NOT AVERAGING REPLICATES------------------------------------------------------
+# trying to do one box per site and per sampling
 
 velocity_long <- didymo_benthotorch_velocity %>%
   pivot_longer(
@@ -422,8 +421,6 @@ velocity_long <- didymo_benthotorch_velocity %>%
     values_to = "Concentration"
   ) # This is what we want to use
 
-library(dplyr)
-library(lubridate)
 
 velocity_long <- velocity_long %>%
   mutate(Month_Year = format(Sampling_date, "%Y-%m"))
@@ -434,11 +431,6 @@ velocity_long$Algae_Type <- factor(velocity_long$Algae_Type, levels = c("Green",
 
 
 # Algae response to velocity at each site
-
-library(tidyverse)
-library(purrr)
-
-
 velocity_long %>%
   group_split(Site) %>%
   walk(~ {
@@ -465,17 +457,15 @@ velocity_long %>%
         panel.grid.minor = element_blank()
       )
     
-    print(site_velocity)  # shows the plot
+    print(site_velocity) 
     
   })
-
-
 
 
 # Algae at each site with boxplots
 # This goes with algae x sites below
 ggplot(velocity_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
-  geom_boxplot(position = position_dodge(width = 0.8)) +  # side-by-side boxes per site
+  geom_boxplot(position = position_dodge(width = 0.8)) +  
   labs(
     x = "Site",
     y = "Algae Concentration",
@@ -486,12 +476,12 @@ ggplot(velocity_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
     name = "Algae Type") + 
   theme_bw() +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),  # tilt x labels if many sites
+    axis.text.x = element_text(angle = 45, hjust = 1),  
     legend.position = "top"
   )
 
 
-# Playing with stats--------------------------------------
+# PLAYING WITH STATS-------------------------------------------------------------
 # Not normal
 shapiro.test(velocity_long$Concentration)
 
@@ -508,10 +498,10 @@ algae_x_sites # comparing algae type differences between sites
 
 
 
+# Mixed models--------------
 
-
-install.packages("lme4")      # for fitting mixed-effects models
-install.packages("lmerTest")  # adds p-values and tests for lme4 models
+install.packages("lme4")      
+install.packages("lmerTest")  
 library(lme4)
 library(lmerTest)
 
@@ -519,25 +509,104 @@ model <- lmer(Concentration ~ Velocity * Algae_Type + (1|Site) + (1|Month_Year),
               data = velocity_long)
 
 summary(model)
-anova(model)
+# Significant relationship with diatoms and velocity in relation to the reference,
+# which is green, so not really what we are interested in
 
 
-
-# just diatoms
-
+# Just diatoms
+# Velocity
 diatoms <- velocity_long %>%
   filter(Algae_Type == "Diatoms")
 
 model <- lmer(Concentration ~ Velocity  + (1|Site) + (1|Month_Year),
-              data = diatoms)
-
-summary(model)
-anova(model)
-
+              data = diatoms) 
+summary(model) # significant negative relationship: as velocity increases,
+# diatom concentration decreases.
 
 
+# Discharge
 model <- lmer(Concentration ~ mean_30d  + (1|Site) + (1|Month_Year),
-              data = diatoms)
-
+              data = diatoms) 
 summary(model)
+# No relationship with mean 30 d discharge before sampling
 anova(model)
+
+
+
+
+# MOVING WINDOW ----------------------------------------------------------------
+install.packages("climwin")
+library(climwin)
+
+# Filtering all available diatom data, not just the ones with velocity
+diatoms_discharge <- didymo_benthotorch %>%
+  pivot_longer(
+    cols = c(Cyano, Green, Diatoms),   # the algae columns
+    names_to = "Algae_Type",
+    values_to = "Concentration"
+  ) # This is what we want to use
+
+diatoms_discharge <- diatoms_discharge %>%
+  filter(Algae_Type == "Diatoms")
+
+# Remove rows with NA concentrations or missing dates
+diatoms_discharge <- diatoms_discharge %>%
+  filter(!is.na(Concentration), !is.na(Sampling_date))
+
+
+# Convert dates to Date class
+discharge_data$Date <- as.Date(discharge_data$Date)
+diatoms_discharge$Sampling_date <- as.Date(diatoms_discharge$Sampling_date)
+
+discharge_data <- discharge_data %>%
+  filter(!is.na(Discharge_cfs), !is.na(Date))
+
+
+# Add year and day-of-year columns to biological dataset
+diatoms_discharge$refday <- as.numeric(format(diatoms_discharge$Sampling_date, "%j"))
+diatoms_discharge$year   <- as.numeric(format(diatoms_discharge$Sampling_date, "%Y"))
+
+result <- slidingwin(
+  xvar = list(climate = discharge_data$Discharge_cfs,
+              date = discharge_data$Date),
+  cdate = discharge_data$Date,   # climate reference dates (from USGS gauge)
+  bdate = diatoms_discharge$Sampling_date, # biological sampling dates
+  cinterval = "day",
+  baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+  spatial = diatoms_discharge$Site,        # multiple sites
+  #refday = diatoms_discharge$refday,       # day-of-year of sampling
+  type = "absolute",
+  range = c(30,0)               # test windows up to 90 days before sampling
+)
+
+plo
+
+
+x <-diatoms_discharge %>%
+  group_by(Site, year) %>%
+  summarise(refdays = list(unique(refday)))
+
+discharge_data %>%
+  mutate(year = as.numeric(format(Date, "%Y")),
+         refday = as.numeric(format(Date, "%j"))) %>%
+  group_by(year) %>%
+  summarise(climate_refdays = list(unique(refday)))
+
+
+
+MassWin <- slidingwin(xvar = list(climate = discharge_data$Discharge_cfs),
+                      cdate = discharge_data$Date,
+                      bdate = diatoms_discharge$Sampling_date,
+                      baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                      cinterval = "day",
+                      range = c(30, 0),
+                      type = "absolute", refday = c(20, 05),
+                      stat = "mean",
+                      func = "lin")
+
+head(MassWin[[1]]$Dataset)
+
+MassWin[[1]]$BestModel
+MassOutput <- MassWin[[1]]$Dataset
+
+plotdelta(dataset = MassOutput) #Red shows strong regions
