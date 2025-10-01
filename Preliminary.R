@@ -577,8 +577,8 @@ MeanWin <- slidingwin(xvar = list(climate = discharge_data$Discharge_cfs),
                       cinterval = "day",
                       range = c(30, 0),
                       #type = "absolute", refday = c(20, 9), #not exactly sure what ref date we should use
-                      type = "relative",
-                      stat = "mean", #can also do max
+                      type = "relative", # bc we have no specific day in mind
+                      stat = "max", #can also do max
                       func = "lin")
 
 
@@ -600,7 +600,7 @@ MeanWin_single <- singlewin(xvar = list(climate = discharge_data$Discharge_cfs),
                         baseline = lm(Concentration ~ 1, data = diatoms_discharge),
                         cinterval = "day",
                         range = c(30, 0),
-                        type = "absolute", refday = c(20, 8), #not exactly sure what ref date we should use
+                        type = "relative", #not exactly sure what ref date we should use
                         stat = "mean", #can also do max
                         func = "lin")
 
@@ -617,7 +617,7 @@ MeanWin_rand <- randwin(repeats = 5,
                         baseline = lm(Concentration ~ 1, data = diatoms_discharge),
                         cinterval = "day",
                         range = c(30, 0),
-                        type = "absolute", refday = c(20, 05), #not exactly sure what ref date we should use
+                        type = "relative", #not exactly sure what ref date we should use
                         stat = "mean", #can also do max
                         func = "lin")
 
