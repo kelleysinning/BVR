@@ -535,6 +535,7 @@ anova(model)
 
 
 # MOVING WINDOW ----------------------------------------------------------------
+# https://cran.r-project.org/web/packages/climwin/vignettes/climwin.html
 install.packages("climwin")
 library(climwin)
 
@@ -546,6 +547,7 @@ diatoms_discharge <- didymo_benthotorch %>%
     values_to = "Concentration"
   ) # This is what we want to use
 
+# Now, filtering just for algae
 diatoms_discharge <- diatoms_discharge %>%
   filter(Algae_Type == "Diatoms")
 
@@ -559,56 +561,68 @@ discharge_data$Date <- as.Date(discharge_data$Date)
 diatoms_discharge$Sampling_date <- as.Date(diatoms_discharge$Sampling_date)
 
 discharge_data <- discharge_data %>%
-  filter(!is.na(Discharge_cfs), !is.na(Date))
+  filter(!is.na(Discharge_cfs), !is.na(Date)) # removing anything weird
 
 
 # Add year and day-of-year columns to biological dataset
 diatoms_discharge$refday <- as.numeric(format(diatoms_discharge$Sampling_date, "%j"))
 diatoms_discharge$year   <- as.numeric(format(diatoms_discharge$Sampling_date, "%Y"))
 
-result <- slidingwin(
-  xvar = list(climate = discharge_data$Discharge_cfs,
-              date = discharge_data$Date),
-  cdate = discharge_data$Date,   # climate reference dates (from USGS gauge)
-  bdate = diatoms_discharge$Sampling_date, # biological sampling dates
-  cinterval = "day",
-  baseline = lm(Concentration ~ 1, data = diatoms_discharge),
-  spatial = diatoms_discharge$Site,        # multiple sites
-  #refday = diatoms_discharge$refday,       # day-of-year of sampling
-  type = "absolute",
-  range = c(30,0)               # test windows up to 90 days before sampling
-)
-
-plo
 
 
-x <-diatoms_discharge %>%
-  group_by(Site, year) %>%
-  summarise(refdays = list(unique(refday)))
-
-discharge_data %>%
-  mutate(year = as.numeric(format(Date, "%Y")),
-         refday = as.numeric(format(Date, "%j"))) %>%
-  group_by(year) %>%
-  summarise(climate_refdays = list(unique(refday)))
-
-
-
-MassWin <- slidingwin(xvar = list(climate = discharge_data$Discharge_cfs),
+MeanWin <- slidingwin(xvar = list(climate = discharge_data$Discharge_cfs),
                       cdate = discharge_data$Date,
                       bdate = diatoms_discharge$Sampling_date,
                       baseline = lm(Concentration ~ 1, data = diatoms_discharge),
                       cinterval = "day",
                       range = c(30, 0),
-                      type = "absolute", refday = c(20, 05),
-                      stat = "mean",
+                      #type = "absolute", refday = c(20, 9), #not exactly sure what ref date we should use
+                      type = "relative",
+                      stat = "mean", #can also do max
                       func = "lin")
 
-head(MassWin[[1]]$Dataset)
 
-MassWin[[1]]$BestModel
-MassOutput <- MassWin[[1]]$Dataset
+head(MeanWin[[1]]$Dataset)
 
-plotdelta(dataset = MassOutput) #Red shows strong regions/windows
-plotweights(dataset = MassOutput)
-plotbetas(dataset = MassOutput)
+MeanWin[[1]]$BestModel
+MeanOutput <- MeanWin[[1]]$Dataset
+
+plotdelta(dataset = MeanOutput) # Red shows strong regions/windows
+plotweights(dataset = MeanOutput)
+plotbetas(dataset = MeanOutput)
+plotwin(dataset = MeanOutput)
+
+
+
+MeanWin_single <- singlewin(xvar = list(climate = discharge_data$Discharge_cfs),
+                        cdate = discharge_data$Date,
+                        bdate = diatoms_discharge$Sampling_date,
+                        baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                        cinterval = "day",
+                        range = c(30, 0),
+                        type = "absolute", refday = c(20, 8), #not exactly sure what ref date we should use
+                        stat = "mean", #can also do max
+                        func = "lin")
+
+
+plotbest(dataset = MeanOutput,
+         bestmodel = MeanWin_single$BestModel, 
+         bestmodeldata = MeanWin_single$BestModelData)
+
+# Accounting for overfitting-----------------
+MeanWin_rand <- randwin(repeats = 5, 
+                        xvar = list(climate = discharge_data$Discharge_cfs),
+                        cdate = discharge_data$Date,
+                        bdate = diatoms_discharge$Sampling_date,
+                        baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                        cinterval = "day",
+                        range = c(30, 0),
+                        type = "absolute", refday = c(20, 05), #not exactly sure what ref date we should use
+                        stat = "mean", #can also do max
+                        func = "lin")
+
+datasetrand = MeanWin_rand[[1]]
+pvalue(MeanOutput <- MeanWin[[1]]$Dataset, datasetrand = MeanWin_rand[[1]], metric = "C", sample.size = 47)
+# p < 0.05 original slidingwin result is unlikely to be an issue of overfitting
+
+plothist(dataset = MassOutput, datasetrand = MassRand)
