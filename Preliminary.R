@@ -208,6 +208,7 @@ ggplot(algae_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
   )
 
 
+
 # Boxplots across discharge...first have to make discharge categorical
 
 # To look at boxplots before algae was averaged across replicates run this # code below
@@ -539,6 +540,10 @@ anova(model)
 install.packages("climwin")
 library(climwin)
 
+install.packages("quantreg")
+library(quantreg)
+
+
 # Filtering all available diatom data, not just the ones with velocity
 diatoms_discharge <- didymo_benthotorch %>%
   pivot_longer(
@@ -552,7 +557,8 @@ diatoms_discharge <- diatoms_discharge %>%
   filter(Algae_Type == "Diatoms")
 
 # Remove rows with NA concentrations or missing dates
-diatoms_discharge <- diatoms_discharge %>%
+diatoms_discharge <- diatoms_discharge  %>%
+  mutate(Month_Year = format(Sampling_date, "%Y-%m"))%>%
   filter(!is.na(Concentration), !is.na(Sampling_date))
 
 
@@ -573,18 +579,40 @@ diatoms_discharge$year   <- as.numeric(format(diatoms_discharge$Sampling_date, "
 MeanWin <- slidingwin(xvar = list(climate = discharge_data$Discharge_cfs),
                       cdate = discharge_data$Date,
                       bdate = diatoms_discharge$Sampling_date,
-                      baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                      #baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                      baseline = lme4::lmer(Concentration ~ 1 + (1|Site) , data = diatoms_discharge),
                       cinterval = "day",
                       range = c(30, 0),
                       #type = "absolute", refday = c(20, 9), #not exactly sure what ref date we should use
                       type = "relative", # bc we have no specific day in mind
-                      stat = "max", #can also do max
+                      stat = c("max","mean"), #can also do max
                       func = "lin")
 
 
 head(MeanWin[[1]]$Dataset)
 
 MeanWin[[1]]$BestModel
+
+
+# Side quest to do a quantile regression
+best<-MeanWin[[1]]$BestModelData # dataset used in the best window
+
+qmodel <- rq(yvar ~ climate, data = best, tau = 0.5)
+summary(qmodel)
+
+ggplot(best, aes(x = climate, y = yvar)) +
+  geom_point(color = "blue", size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  labs(
+    x = "Discharge (cfs)",
+    y = "Concentration",
+    title = "Best Window: Concentration vs Discharge"
+  ) +
+  theme_minimal() # looks different from plotbest
+
+
+# For each 1-unit increase in climate (e.g., 1 cfs of discharge), 
+# the model predicts an increase of 0.0009145 units in diatom concentration.
 MeanOutput <- MeanWin[[1]]$Dataset
 
 plotdelta(dataset = MeanOutput) # Red shows strong regions/windows
@@ -597,13 +625,15 @@ plotwin(dataset = MeanOutput)
 MeanWin_single <- singlewin(xvar = list(climate = discharge_data$Discharge_cfs),
                         cdate = discharge_data$Date,
                         bdate = diatoms_discharge$Sampling_date,
-                        baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                        #baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                        baseline = lme4::lmer(Concentration ~ 1 + (1|Site), data = diatoms_discharge),
                         cinterval = "day",
                         range = c(30, 0),
                         type = "relative", #not exactly sure what ref date we should use
-                        stat = "mean", #can also do max
+                        stat = c("max"), #can also do max
                         func = "lin")
 
+# After finding best window
 
 plotbest(dataset = MeanOutput,
          bestmodel = MeanWin_single$BestModel, 
@@ -614,11 +644,12 @@ MeanWin_rand <- randwin(repeats = 5,
                         xvar = list(climate = discharge_data$Discharge_cfs),
                         cdate = discharge_data$Date,
                         bdate = diatoms_discharge$Sampling_date,
-                        baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                        #baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                        baseline = lme4::lmer(Concentration ~ 1 + (1|Site) + (1|Month_Year), data = diatoms_discharge),
                         cinterval = "day",
                         range = c(30, 0),
                         type = "relative", #not exactly sure what ref date we should use
-                        stat = "mean", #can also do max
+                        stat = c("mean", "max"), #can also do max
                         func = "lin")
 
 datasetrand = MeanWin_rand[[1]]
@@ -626,3 +657,96 @@ pvalue(MeanOutput <- MeanWin[[1]]$Dataset, datasetrand = MeanWin_rand[[1]], metr
 # p < 0.05 original slidingwin result is unlikely to be an issue of overfitting
 
 plothist(dataset = MassOutput, datasetrand = MassRand)
+
+
+
+
+# Trying with log transformation------------------------------------------------
+discharge_data <- discharge_data %>% 
+      mutate(log_discharge = log(Discharge_cfs))%>% 
+      mutate(scaled = scale(log_discharge))
+
+MeanWin <- slidingwin(xvar = list(climate = discharge_data$scaled),
+                      cdate = discharge_data$Date,
+                      bdate = diatoms_discharge$Sampling_date,
+                      #baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                      baseline = lme4::lmer(Concentration ~ 1 + (1|Site) , data = diatoms_discharge),
+                      cinterval = "day",
+                      range = c(30, 0),
+                      #type = "absolute", refday = c(20, 9), #not exactly sure what ref date we should use
+                      type = "relative", # bc we have no specific day in mind
+                      stat = c("max","mean"), #can also do max
+                      func = "lin")
+
+
+head(MeanWin[[1]]$Dataset)
+
+MeanWin[[1]]$BestModel
+
+
+# Side quest to do a quantile regression
+best<-MeanWin[[1]]$BestModelData # dataset used in the best window
+
+qmodel <- rq(yvar ~ climate, data = best, tau = 0.5)
+summary(qmodel)
+
+ggplot(best, aes(x = climate, y = yvar)) +
+  geom_point(color = "blue", size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  labs(
+    x = "Scaled Discharge (cfs)",
+    y = "Concentration",
+    title = "Best Window: Concentration vs Discharge"
+  ) +
+  theme_minimal() # looks different from plotbest
+
+
+# For each 1-unit increase in climate (e.g., 1 cfs of discharge), 
+# the model predicts an increase of 0.0009145 units in diatom concentration.
+MeanOutput <- MeanWin[[1]]$Dataset
+
+plotdelta(dataset = MeanOutput) # Red shows strong regions/windows
+plotweights(dataset = MeanOutput)
+plotbetas(dataset = MeanOutput)
+plotwin(dataset = MeanOutput)
+
+
+
+MeanWin_single <- singlewin(xvar = list(climate = discharge_data$scaled),
+                            cdate = discharge_data$Date,
+                            bdate = diatoms_discharge$Sampling_date,
+                            #baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                            baseline = lme4::lmer(Concentration ~ 1 + (1|Site), data = diatoms_discharge),
+                            cinterval = "day",
+                            range = c(30, 0),
+                            type = "relative", #not exactly sure what ref date we should use
+                            stat = c("max"), #can also do max
+                            func = "lin")
+
+# After finding best window
+
+plotbest(dataset = MeanOutput,
+         bestmodel = MeanWin_single$BestModel, 
+         bestmodeldata = MeanWin_single$BestModelData)
+
+# Accounting for overfitting-----------------
+MeanWin_rand <- randwin(repeats = 5, 
+                        xvar = list(climate = discharge_data$scaled),
+                        cdate = discharge_data$Date,
+                        bdate = diatoms_discharge$Sampling_date,
+                        #baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                        baseline = lme4::lmer(Concentration ~ 1 + (1|Site), data = diatoms_discharge),
+                        cinterval = "day",
+                        range = c(30, 0),
+                        type = "relative", #not exactly sure what ref date we should use
+                        stat = c("mean", "max"), #can also do max
+                        func = "lin")
+
+datasetrand = MeanWin_rand[[1]]
+pvalue(MeanOutput <- MeanWin[[1]]$Dataset, datasetrand = MeanWin_rand[[1]], metric = "C", sample.size = 47)
+# p < 0.05 original slidingwin result is unlikely to be an issue of overfitting
+
+plothist(dataset = MassOutput, datasetrand = MassRand)
+
+plot(discharge_data$Date, discharge_data$log(Discharge_cfs))
+plot(discharge_data$Date, log10(discharge_data$Discharge_cfs))
