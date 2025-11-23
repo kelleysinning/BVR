@@ -1,0 +1,166 @@
+---
+title: "ClimWin Demonstration"
+author: "Kelley Sinning"
+date: "2025-11-23"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Kanno Lab Meeting 12/1/2025 ClimWin R Package Demonstration
+
+#### The vignette for this package is very helpful and it is where I drew all the information for this from. The link to that is : https://cran.r-project.org/web/packages/climwin/vignettes/climwin.html
+
+#### First, we will install the packages and read CSVs that we will be using for this demonstration.
+
+```{r Getting Situated}
+# Install package
+# install.packages("climwin") put this in your console or else knitting will not work
+library(climwin)
+
+# Set your working directory to your personal laptop
+setwd("~/Library/CloudStorage/OneDrive-Colostate/Data/BVR")
+
+# CSVs
+# From USGS Green Mountain Gauge--mean discharge from 10/1/2022-9/29/2025
+discharge_data <- read.csv("discharge_data.csv") # Qualifier A means it was approved, P = provisional
+
+# Diatom conc. from benthotorch from 1/15/2023-8/27/2025
+# ALL available diatom data so far
+diatoms_discharge <- read.csv("diatoms_discharge.csv")
+
+# Convert dates to Date class because it can be finnicky otherwise
+discharge_data$Date <- as.Date(discharge_data$Date, format = "%m/%d/%Y")
+diatoms_discharge$Sampling_date <- as.Date(diatoms_discharge$Sampling_date, format = "%m/%d/%Y")
+discharge_data$Date <- as.Date(discharge_data$Date)
+diatoms_discharge$Sampling_date <- as.Date(diatoms_discharge$Sampling_date)
+
+```
+
+#### This first block of text is the main Sliding Window chunk of code you will run. Supplemental code chunks will be to test for overfitting and singling out the best models. This part is highly personalizable and I tried to make notes of this in the annotation. You can also look further into the vignettes to learn more.
+
+```{r Example}
+SlidWin <- slidingwin(xvar = list(climate = discharge_data$Discharge_cfs),
+                      cdate = discharge_data$Date, # cdate = date variable for climate                             dataset
+                      bdate = diatoms_discharge$Sampling_date, 
+                      # date = date variable for biological dataset
+                      # baseline = lm(Concentration ~ 1, data = diatoms_discharge), 
+                      # no random effects
+                      baseline = lme4::lmer(Concentration ~ 1 + (1|Site), 
+                                            data =    diatoms_discharge),
+                      cinterval = "day", # can also be weeks or months
+                      range = c(30, 0), # can customize this to as many days out from                               biological sample day as you want
+                      type = "relative", # bc we have no specific day in mind as a reference                       day. If we did, this would be "absolute"
+                      stat = c("max","mean"), # can choose if you want means or maxes or both
+                      func = "lin") # can also do quadratic (“quad”), cubic (“cub”),                               logarithmic (“log”) and inverse (“inv”)
+
+head(SlidWin[[1]]$Dataset) # a sneak peak
+
+SlidWin[[1]]$BestModel # BestModel: is a model object showing the relationshipbetween climate and biological date within the strongest climate window.
+
+# When climate = 0, the predicted value of diatoms is 0.600277
+# For each 1-unit increase in climate (e.g., 1 cfs of discharge), the model predicts an increase of 0.000894 units in diatom concentration.
+
+
+```
+
+#### Now, we are plotting the SlidWin output. This will tell us which window of time before our biological sampling that our climate variables were most predictive of what we see. We will also explore the relationship between biological and climate data during that time and how confident we can feel that the model is correct.
+
+```{r Plotting results}
+
+# A new object so we can plot examples from SlidWin
+Output <- SlidWin[[1]]$Dataset
+
+# Distribution of ΔAICc values across all tested climate windows
+# plotdelta shows you which windows are most predictive...red shows strong regions/windows, most predictive
+plotdelta(dataset = Output)
+
+# You can best understand this as: Window open = days before biological sampling, window close = days until biological sampling...basically the same thing
+# For example, if window open is 30 and window close is 20 then the period between 20 - 30 days before biological sampling is when the climate variable was most predictive of your biological data
+
+
+# The higher a model weight value the greater confidence we have that this model is the true ‘best’ model
+# You can be we can be 95% confident that the best climate window falls within 4% of the total fitted models
+plotweights(dataset = Output)
+
+# betalinear is interesting, it shows the relationships between the climate and biological data, which plotdelta does not
+# Blue shows positive relationships: if climate data goes up then biological data goes up
+# Red shows negative relationship: if climate data goes up then biological data goes down or vice versa
+plotbetas(dataset = Output)
+# This is unexpected...tells us that the relationship between discharge and diatoms is low during the most predictive window
+# We can interpret this as us targeting stable, low flows for sampling 
+# This is where you can sleuth and see that there is also a decently predictive window that does have a strong negative relationship whcih is more what we'd expect
+
+
+# plotwin shows boxplots of the start and end point of all climate windows that make up the 95% confidence set. The values above each boxplot represent the median start and end time for these models.
+plotwin(dataset = Output)
+
+```
+
+#### To be sure the the results of SlidWin were not due to random chance, we run randwin. It should have all the same information from slidwin except the new "repeats = " argument. This allows the user to decide how many times they want to randomise the order of the data and re-run the slidingwin analysis. Due to computational time, we chose 5.
+
+```{r Accounting for Overfitting}
+# By running slidingwin on this new randomized dataset we can determine the likelihood of finding our original result by random chance
+SlidWin_rand <- randwin(repeats = 5, 
+                        xvar = list(climate = discharge_data$Discharge_cfs),
+                        cdate = discharge_data$Date,
+                        bdate = diatoms_discharge$Sampling_date,
+                        #baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                        baseline = lme4::lmer(Concentration ~ 1 + (1|Site), 
+                                              data = diatoms_discharge),
+                        cinterval = "day",
+                        range = c(30, 0),
+                        type = "relative", 
+                        stat = c("mean", "max"), 
+                        func = "lin")
+
+# Naming the model output as an object so we can plug it into plothist
+datasetrand = SlidWin_rand[[1]]
+SlidWin_rand[[1]]
+
+pvalue(dataset = SlidWin[[1]]$Dataset, datasetrand = SlidWin_rand[[1]], metric = "C", sample.size = 3)
+# Sample size is number of years in the dataset
+# p < 0.05 original slidingwin result is unlikely to be an issue of overfitting
+
+
+# This gives a histogram of the ΔAICc
+# Values extracted from randwin and a dashed line to show the ΔAICc of the observed result from slidingwin.
+plothist(dataset = Output, datasetrand = datasetrand)
+# As we can see below, the value of ΔAICc from the real data (dashed line) is very different to those values obtained from randomised data, so we can feel confident our results from SlidWin did not occur by chance
+```
+#### Lastly, we can run singlewin to further explore our best model
+
+```{r Putting it all together}
+# We can plot the predictions of our best model over the biological data
+# In the singlewin function the values of range now equate to the start and end time of the single best window, rather than the range over which multiple windows will be tested. Look to Output for that top model for this.
+SlidWin_single <- singlewin(xvar = list(climate = discharge_data$Discharge_cfs),
+                            cdate = discharge_data$Date,
+                            bdate = diatoms_discharge$Sampling_date,
+                            #baseline = lm(Concentration ~ 1, data = diatoms_discharge),
+                            baseline = lme4::lmer(Concentration ~ 1 + (1|Site), 
+                                                  data = diatoms_discharge),
+                            cinterval = "day",
+                            range = c(3, 2),
+                            type = "relative", 
+                            stat = c("max"), 
+                            func = "lin")
+
+# Examining this plot can help us determine whether it may be more appropriate to test alternative relationships of climate (e.g. quadratic or cubic) by adjusting the parameter func or to identify outliers
+plotbest(dataset = Output,
+         bestmodel = SlidWin_single$BestModel, 
+         bestmodeldata = SlidWin_single$BestModelData)
+
+
+
+# Plotting everything
+plotall(dataset = Output,
+        datasetrand = datasetrand,
+        bestmodel = SlidWin_single$BestModel, 
+        bestmodeldata = SlidWin_single$BestModelData)
+
+
+```

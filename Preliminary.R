@@ -72,7 +72,75 @@ didymo_benthotorch <- didymo_benthotorch %>%
   mutate(across(c(Cyano, Green, Diatoms, Chlorophyll.A, Velocity),
                 as.numeric))
 
+# Before getting 30 day stats, I just want to have a df that has the discharge with the sample
+# data that I can have a hydrograph for-----------------------------------------
+library(dplyr)
 
+sort(unique(didymo_benthotorch$Sampling_date))
+sample_dates <- c(
+  "2023-01-15", "2023-03-21", "2023-05-12", "2023-05-24", "2023-06-27", "2023-07-31",
+  "2023-10-04", "2024-05-13", "2024-05-14", "2024-05-15", "2024-05-16", "2024-05-17",
+  "2024-07-24", "2024-07-29", "2024-07-30", "2024-07-31", "2024-08-01", "2024-08-02",
+  "2024-08-13", "2024-09-26", "2024-10-26", "2024-11-14", "2025-01-16", "2025-03-11",
+  "2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23", "2025-06-10",
+  "2025-06-18", "2025-07-30", "2025-08-27"
+)
+
+velocity_dates <- c("2024-07-24", "2024-08-13", "2024-09-26", "2024-10-26", "2024-11-14", "2025-01-16",
+                    "2025-03-11", "2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23",
+                    "2025-06-10", "2025-07-30", "2025-08-27")
+
+
+# Convert to Date
+sample_dates <- as.Date(sample_dates)
+velocity_dates <- as.Date(velocity_dates)
+
+# Adding a new column for it it was sampled or not
+discharge_data <- discharge_data %>%
+  mutate(sampled = if_else(Date %in% sample_dates, "yes", "no"),
+         velocity = if_else(Date %in% velocity_dates, "yes", "no"))
+
+discharge_data <- discharge_data %>%
+  filter(Date >= as.Date("2023-01-01") &
+           Date <= as.Date("2025-09-01"))
+
+
+# Filter just the sampling dates for vertical lines
+sample_dates <- discharge_data %>%
+  filter(sampled == "yes") %>%
+  pull(Date)
+
+velocity_dates <- discharge_data %>%
+  filter(velocity == "yes") %>%
+  pull(Date)
+
+
+
+ggplot(discharge_data, aes(x = Date, y = Discharge_cfs)) +
+  geom_line() +
+  geom_vline(xintercept = sample_dates, color = "#70A494", linetype = "solid") +
+  geom_vline(xintercept = velocity_dates, color = "#DE8A5A", linetype = "solid") +
+  labs(
+       x = "Date",
+       y = "Discharge (cfs)") +
+  theme_minimal()+
+  theme(
+    panel.grid.major = element_blank(),  # remove major grid lines
+    panel.grid.minor = element_blank()   # remove minor grid lines
+  )
+
+
+ggplot(discharge_data, aes(x = Date, y = Discharge_cfs)) +
+  geom_line() +
+  geom_vline(xintercept = sampling_dates, color = "#70A494") +
+  geom_vline(xintercept = velocity_dates, color = "#DE8A5A", linetype = "solid") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  labs(x = "Date", y = "Discharge (cfs)") +
+  theme_minimal()
+
+
+
+# Now, doing 30 day mean averages------------------------------------------------
 # Function to compute 30-day stats for each sample
 get_30day_stats <- function(Sampling_date, discharge_data) {
   start_date <- Sampling_date - days(30)
@@ -248,6 +316,8 @@ ggplot(bins, aes(x = discharge_bin, y = Concentration, fill = Algae_Type)) +
 didymo_benthotorch_velocity <- didymo_benthotorch %>%
   filter(!is.na(Velocity)) 
 
+sort(unique(didymo_benthotorch_velocity$Sampling_date))
+
 # This is for when replicates were avergaed
 avg_didymo_benthotorch_velocity <- didymo_benthotorch_velocity %>%
   select(Sampling_date, Site, Sample.Type,  
@@ -365,13 +435,13 @@ vbins <- velocity_long_avg %>%
                             labels = c("0–0.2", "0.2–0.3", 
                                        "0.3–0.4", "0.4–0.6", "0.6–1", "Above 1")))
 
-vbins <- velocity_long_avg %>%
+vbins <- velocity_long %>%
   mutate(velocity_bin = cut(Velocity,
                             breaks = c(0, 0.2,  0.4, 0.6, 1, Inf),
                             labels = c("0–0.2", "0.2–0.4", "0.4–0.6", 
                                        "0.6–0.1", "Above 1")))
 
-# this is for unaveraged, raw data for diatoms only
+# this is for unaveraged, raw data for diatoms only, see diatoms creation near the mixed models
 vbins <- diatoms %>%
   filter(Velocity >= 0) %>%   # removes negative velocities
   mutate(velocity_bin = cut(Velocity,
@@ -392,6 +462,24 @@ ggplot(vbins, aes(x = velocity_bin, y = Concentration, fill = Algae_Type)) +
   theme_bw() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),  # tilt x labels if many sites
+    legend.position = "top"
+  )
+
+# now, linear
+ggplot(diatoms, aes(x = Velocity, y = Concentration, color = Algae_Type)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, lwd = 1.2) +  # linear trend line
+  labs(
+    x = "Velocity",
+    y = "Diatom Chl-a Concentration (µg/cm²)",
+    color = "Algae Type"
+  ) +
+  scale_color_manual(
+    values = c("Green" = "#70A494", "Cyano" = "#DE8A5A", "Diatoms" = "#2887A1")
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
     legend.position = "top"
   )
 
@@ -524,6 +612,11 @@ model <- lmer(Concentration ~ Velocity  + (1|Site) + (1|Month_Year),
 summary(model) # significant negative relationship: as velocity increases,
 # diatom concentration decreases.
 
+# without random effects
+model <- lm(Concentration ~ Velocity,
+              data = diatoms) 
+summary(model)  
+
 
 # Discharge
 model <- lmer(Concentration ~ mean_30d  + (1|Site) + (1|Month_Year),
@@ -544,17 +637,19 @@ install.packages("quantreg")
 library(quantreg)
 
 
-# Filtering all available diatom data, not just the ones with velocity
+# Rearranging all available diatom data, not just the ones with velocity
+# This is similar to diatoms df but includes all didymo, not just velocity paired ones
 diatoms_discharge <- didymo_benthotorch %>%
   pivot_longer(
     cols = c(Cyano, Green, Diatoms),   # the algae columns
     names_to = "Algae_Type",
     values_to = "Concentration"
-  ) # This is what we want to use
+  ) 
 
-# Now, filtering just for algae
+# Now, filtering just for diatoms
 diatoms_discharge <- diatoms_discharge %>%
-  filter(Algae_Type == "Diatoms")
+  filter(Algae_Type == "Diatoms")%>%
+  select(-Chlorophyll.A, -Sample.Type)
 
 # Remove rows with NA concentrations or missing dates
 diatoms_discharge <- diatoms_discharge  %>%
@@ -569,10 +664,13 @@ diatoms_discharge$Sampling_date <- as.Date(diatoms_discharge$Sampling_date)
 discharge_data <- discharge_data %>%
   filter(!is.na(Discharge_cfs), !is.na(Date)) # removing anything weird
 
+# Save the data frame to a CSV file
+write.csv(discharge_data, "discharge_data.csv", row.names = FALSE)
+write.csv(diatoms_discharge, "diatoms_discharge.csv", row.names = FALSE)
 
 # Add year and day-of-year columns to biological dataset
-diatoms_discharge$refday <- as.numeric(format(diatoms_discharge$Sampling_date, "%j"))
-diatoms_discharge$year   <- as.numeric(format(diatoms_discharge$Sampling_date, "%Y"))
+#diatoms_discharge$refday <- as.numeric(format(diatoms_discharge$Sampling_date, "%j"))
+#diatoms_discharge$year   <- as.numeric(format(diatoms_discharge$Sampling_date, "%Y"))
 
 
 
@@ -580,12 +678,12 @@ MeanWin <- slidingwin(xvar = list(climate = discharge_data$Discharge_cfs),
                       cdate = discharge_data$Date,
                       bdate = diatoms_discharge$Sampling_date,
                       #baseline = lm(Concentration ~ 1, data = diatoms_discharge),
-                      baseline = lme4::lmer(Concentration ~ 1 + (1|Site) , data = diatoms_discharge),
+                      baseline = lme4::lmer(Concentration ~ 1 + (1|Site) + (1|Month_Year) , data = diatoms_discharge),
                       cinterval = "day",
                       range = c(30, 0),
                       #type = "absolute", refday = c(20, 9), #not exactly sure what ref date we should use
                       type = "relative", # bc we have no specific day in mind
-                      stat = c("max","mean"), #can also do max
+                      stat = c("max","mean"), 
                       func = "lin")
 
 
@@ -593,22 +691,6 @@ head(MeanWin[[1]]$Dataset)
 
 MeanWin[[1]]$BestModel
 
-
-# Side quest to do a quantile regression
-best<-MeanWin[[1]]$BestModelData # dataset used in the best window
-
-qmodel <- rq(yvar ~ climate, data = best, tau = 0.5)
-summary(qmodel)
-
-ggplot(best, aes(x = climate, y = yvar)) +
-  geom_point(color = "blue", size = 3, alpha = 0.7) +
-  geom_smooth(method = "lm", color = "red", se = FALSE) +
-  labs(
-    x = "Discharge (cfs)",
-    y = "Concentration",
-    title = "Best Window: Concentration vs Discharge"
-  ) +
-  theme_minimal() # looks different from plotbest
 
 
 # For each 1-unit increase in climate (e.g., 1 cfs of discharge), 
@@ -621,7 +703,7 @@ plotbetas(dataset = MeanOutput)
 plotwin(dataset = MeanOutput)
 
 
-
+# we can plot the predictions of our best model over the biological data
 MeanWin_single <- singlewin(xvar = list(climate = discharge_data$Discharge_cfs),
                         cdate = discharge_data$Date,
                         bdate = diatoms_discharge$Sampling_date,
@@ -633,11 +715,10 @@ MeanWin_single <- singlewin(xvar = list(climate = discharge_data$Discharge_cfs),
                         stat = c("max"), #can also do max
                         func = "lin")
 
-# After finding best window
+plotbest(dataset = MassOutput,
+         bestmodel = MassSingle$BestModel, 
+         bestmodeldata = MassSingle$BestModelData)
 
-plotbest(dataset = MeanOutput,
-         bestmodel = MeanWin_single$BestModel, 
-         bestmodeldata = MeanWin_single$BestModelData)
 
 # Accounting for overfitting-----------------
 MeanWin_rand <- randwin(repeats = 5, 
@@ -652,11 +733,14 @@ MeanWin_rand <- randwin(repeats = 5,
                         stat = c("mean", "max"), #can also do max
                         func = "lin")
 
+# Naming the model output as an object so we can plug it into plothist
 datasetrand = MeanWin_rand[[1]]
-pvalue(MeanOutput <- MeanWin[[1]]$Dataset, datasetrand = MeanWin_rand[[1]], metric = "C", sample.size = 47)
+
+pvalue(dataset = MeanOutput[[1]], datasetrand = MeanWin_rand[[1]], metric = "C", sample.size = 3)
 # p < 0.05 original slidingwin result is unlikely to be an issue of overfitting
 
-plothist(dataset = MassOutput, datasetrand = MassRand)
+
+plothist(dataset = MassOutput, datasetrand = datasetrand)
 
 
 
@@ -683,24 +767,6 @@ head(MeanWin[[1]]$Dataset)
 
 MeanWin[[1]]$BestModel
 
-
-# Side quest to do a quantile regression
-best<-MeanWin[[1]]$BestModelData # dataset used in the best window
-
-qmodel <- rq(yvar ~ climate, data = best, tau = 0.5)
-summary(qmodel)
-
-ggplot(best, aes(x = climate, y = yvar)) +
-  geom_point(color = "blue", size = 3, alpha = 0.7) +
-  geom_smooth(method = "lm", color = "red", se = FALSE) +
-  labs(
-    x = "Scaled Discharge (cfs)",
-    y = "Concentration",
-    title = "Best Window: Concentration vs Discharge"
-  ) +
-  theme_minimal() # looks different from plotbest
-
-
 # For each 1-unit increase in climate (e.g., 1 cfs of discharge), 
 # the model predicts an increase of 0.0009145 units in diatom concentration.
 MeanOutput <- MeanWin[[1]]$Dataset
@@ -718,7 +784,7 @@ MeanWin_single <- singlewin(xvar = list(climate = discharge_data$scaled),
                             #baseline = lm(Concentration ~ 1, data = diatoms_discharge),
                             baseline = lme4::lmer(Concentration ~ 1 + (1|Site), data = diatoms_discharge),
                             cinterval = "day",
-                            range = c(30, 0),
+                            range = c(3, 2), # change to single window range
                             type = "relative", #not exactly sure what ref date we should use
                             stat = c("max"), #can also do max
                             func = "lin")
@@ -743,10 +809,13 @@ MeanWin_rand <- randwin(repeats = 5,
                         func = "lin")
 
 datasetrand = MeanWin_rand[[1]]
-pvalue(MeanOutput <- MeanWin[[1]]$Dataset, datasetrand = MeanWin_rand[[1]], metric = "C", sample.size = 47)
+pvalue(dataset = MeanOutput[[1]], datasetrand = MeanWin_rand[[1]], metric = "C", sample.size = 3)
 # p < 0.05 original slidingwin result is unlikely to be an issue of overfitting
 
 plothist(dataset = MassOutput, datasetrand = MassRand)
 
-plot(discharge_data$Date, discharge_data$log(Discharge_cfs))
+
 plot(discharge_data$Date, log10(discharge_data$Discharge_cfs))
+
+
+

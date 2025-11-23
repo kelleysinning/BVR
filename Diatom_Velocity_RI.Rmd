@@ -1,0 +1,111 @@
+---
+title: "Diatom Velocity Ratio Estimation"
+author: "Kelley Sinning"
+date: "2025-11-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r study1}
+dia_vel <-read.csv("~/Library/CloudStorage/OneDrive-Colostate/Data/BVR/diatom_velocity_RI.csv")
+
+library(tidyverse)
+
+# Ratio estimator
+N <- length(dia_vel$Diatoms)
+N
+
+u <- unique(dia_vel$Sampling_date)
+u
+
+n <- sum(!is.na(dia_vel$Velocity))
+n
+
+xi <- dia_vel$Diatoms # the variable you know the whole population (auxillary variable)
+
+yi <- dia_vel$Velocity # the variable you don't know the whole population (variable of interest/primary)
+
+paired <- dia_vel[complete.cases(dia_vel$Diatoms, dia_vel$Velocity), ]
+
+xi_filtered <- paired %>% select(Diatoms)
+# filtering for auxillary variables (diatoms) that are paired with velocity, these are the diatom values paired with the existing velocity ones
+
+mean_velocity_y <- mean(yi, na.rm = TRUE) # mean of known velocity
+mean_diatom_x <- mean(xi, na.rm = TRUE)# mean of all diatom values
+mean_x_filtered <- mean(xi_filtered$Diatoms) # mean of filtered diatom variables that are paired with known velocity
+
+sample_ratio <- mean_velocity_y/mean_x_filtered # known velocity divided by paired diatom values to see sample ratio, aka how much might you expect velocity to respond per unit of diatom...more or less
+
+mu_r <- sample_ratio*mean_diatom_x # multiplying known diatom values x the sample ratio to estimate velocity
+
+rxi <- sample_ratio*xi_filtered # estimating "y hat", how you might expect y to respond based on the known x values and the sample ratio
+
+rxi <- rxi %>%
+  rename(Y_hat = Diatoms) %>% # this is actually the velocity, was just labeled as diatoms
+  mutate(Diatoms = paired$Diatoms) # showing it with the actual known diatoms
+
+
+sig_r_2 <- (1/(N-1))*sum((yi - rxi)^2) # estimating the variance of the ratio estimator.
+var <- ((N-n)/N)*(sig_r_2/n) # estimated variance of the ratio estimator of the population mean abundance
+
+library(ggplot2)
+
+str(paired)
+
+
+plot <- ggplot(paired, aes(x = Velocity, y = Diatoms)) +
+  geom_point(alpha = 0.7, color = "#2887A1") +        # point color
+  geom_smooth(method = "lm", se = FALSE, lwd = 1.2, 
+              color = "#2887A1") +                    # line color
+  labs(
+    x = "Velocity",
+    y = "Diatom Chl-a Concentration (µg/cm²)"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"  # no legend needed
+  )
+
+
+print(plot)
+
+
+
+plot <- ggplot() +
+  
+  # --- First dataset (paired) ---
+  geom_point(data = paired, aes(x = Velocity, y = Diatoms),
+             alpha = 0.7, color = "#2887A1") +
+  geom_smooth(data = paired, aes(x = Velocity, y = Diatoms),
+              method = "lm", se = FALSE, lwd = 1.2, color = "#2887A1") +
+
+  # --- Second dataset (rxi (y-hat)) ---
+  geom_point(data = rxi, aes(x = Y_hat, y = Diatoms),
+             alpha = 0.7, color = "#DE8A5A") +
+  geom_smooth(data = rxi, aes(x = Y_hat, y = Diatoms),
+              method = "lm", se = FALSE, lwd = 1.2, color = "#DE8A5A") +
+
+  labs(
+    x = "Velocity (m/s)",
+    y = "Chl-a Concentration (µg/cm²)"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  )
+
+print(plot)
+
+
+# Fit linear model for rxi
+lm_rxi <- lm(Diatoms ~ Y_hat, data = rxi)
+
+# Get summary statistics
+summary(lm_rxi)
+
+```

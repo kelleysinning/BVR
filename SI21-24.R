@@ -14,6 +14,7 @@ setwd("~/Library/CloudStorage/OneDrive-Colostate/Data/BVR")
 
 # IMPORT SIA DATA
 SIA_FISH <- read_csv("Meta_SIA_Data.csv")
+problems()
 
 str(SIA_FISH)
 
