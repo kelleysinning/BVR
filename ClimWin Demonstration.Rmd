@@ -36,8 +36,7 @@ diatoms_discharge <- read.csv("diatoms_discharge.csv")
 # Convert dates to Date class because it can be finnicky otherwise
 discharge_data$Date <- as.Date(discharge_data$Date, format = "%m/%d/%Y")
 diatoms_discharge$Sampling_date <- as.Date(diatoms_discharge$Sampling_date, format = "%m/%d/%Y")
-discharge_data$Date <- as.Date(discharge_data$Date)
-diatoms_discharge$Sampling_date <- as.Date(diatoms_discharge$Sampling_date)
+
 
 ```
 
@@ -45,7 +44,7 @@ diatoms_discharge$Sampling_date <- as.Date(diatoms_discharge$Sampling_date)
 
 ```{r Example}
 SlidWin <- slidingwin(xvar = list(climate = discharge_data$Discharge_cfs),
-                      cdate = discharge_data$Date, # cdate = date variable for climate                             dataset
+                      cdate = discharge_data$Date, # cdate = date variable for climate dataset
                       bdate = diatoms_discharge$Sampling_date, 
                       # date = date variable for biological dataset
                       # baseline = lm(Concentration ~ 1, data = diatoms_discharge), 
@@ -53,14 +52,14 @@ SlidWin <- slidingwin(xvar = list(climate = discharge_data$Discharge_cfs),
                       baseline = lme4::lmer(Concentration ~ 1 + (1|Site), 
                                             data =    diatoms_discharge),
                       cinterval = "day", # can also be weeks or months
-                      range = c(30, 0), # can customize this to as many days out from                               biological sample day as you want
-                      type = "relative", # bc we have no specific day in mind as a reference                       day. If we did, this would be "absolute"
+                      range = c(30, 0), # can customize this to as many days out from biological sample day as you want
+                      type = "relative", # bc we have no specific day in mind as a reference day. If we did, this would be"absolute"
                       stat = c("max","mean"), # can choose if you want means or maxes or both
-                      func = "lin") # can also do quadratic (“quad”), cubic (“cub”),                               logarithmic (“log”) and inverse (“inv”)
+                      func = "lin") # can also do quadratic (“quad”), cubic (“cub”), logarithmic (“log”) and inverse (“inv”)
 
 head(SlidWin[[1]]$Dataset) # a sneak peak
 
-SlidWin[[1]]$BestModel # BestModel: is a model object showing the relationshipbetween climate and biological date within the strongest climate window.
+SlidWin[[1]]$BestModel # BestModel: is a model object showing the relationship between climate and biological date within the strongest climate window.
 
 # When climate = 0, the predicted value of diatoms is 0.600277
 # For each 1-unit increase in climate (e.g., 1 cfs of discharge), the model predicts an increase of 0.000894 units in diatom concentration.
@@ -88,7 +87,7 @@ plotdelta(dataset = Output)
 plotweights(dataset = Output)
 
 # betalinear is interesting, it shows the relationships between the climate and biological data, which plotdelta does not
-# Blue shows positive relationships: if climate data goes up then biological data goes up
+# Blue shows little relationships
 # Red shows negative relationship: if climate data goes up then biological data goes down or vice versa
 plotbetas(dataset = Output)
 # This is unexpected...tells us that the relationship between discharge and diatoms is low during the most predictive window
@@ -119,7 +118,7 @@ SlidWin_rand <- randwin(repeats = 5,
                         func = "lin")
 
 # Naming the model output as an object so we can plug it into plothist
-datasetrand = SlidWin_rand[[1]]
+OutputRand = SlidWin_rand[[1]]
 SlidWin_rand[[1]]
 
 pvalue(dataset = SlidWin[[1]]$Dataset, datasetrand = SlidWin_rand[[1]], metric = "C", sample.size = 3)
@@ -129,8 +128,8 @@ pvalue(dataset = SlidWin[[1]]$Dataset, datasetrand = SlidWin_rand[[1]], metric =
 
 # This gives a histogram of the ΔAICc
 # Values extracted from randwin and a dashed line to show the ΔAICc of the observed result from slidingwin.
-plothist(dataset = Output, datasetrand = datasetrand)
-# As we can see below, the value of ΔAICc from the real data (dashed line) is very different to those values obtained from randomised data, so we can feel confident our results from SlidWin did not occur by chance
+plothist(dataset = Output, datasetrand = OutputRand)
+# As we can see below, the value of ΔAICc from the real data (dashed line) is very different to those values obtained from randomized data, so we can feel confident our results from SlidWin did not occur by chance
 ```
 #### Lastly, we can run singlewin to further explore our best model
 
@@ -146,7 +145,7 @@ SlidWin_single <- singlewin(xvar = list(climate = discharge_data$Discharge_cfs),
                             cinterval = "day",
                             range = c(3, 2),
                             type = "relative", 
-                            stat = c("max"), 
+                            stat = c("max"), # choose max bc this was the best model output
                             func = "lin")
 
 # Examining this plot can help us determine whether it may be more appropriate to test alternative relationships of climate (e.g. quadratic or cubic) by adjusting the parameter func or to identify outliers
@@ -158,7 +157,7 @@ plotbest(dataset = Output,
 
 # Plotting everything
 plotall(dataset = Output,
-        datasetrand = datasetrand,
+        datasetrand = OutputRand,
         bestmodel = SlidWin_single$BestModel, 
         bestmodeldata = SlidWin_single$BestModelData)
 

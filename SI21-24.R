@@ -9,12 +9,21 @@ library(pbkrtest)
 library(emmeans)
 library(car)
 library(kableExtra)
+library(lubridate)
 
 setwd("~/Library/CloudStorage/OneDrive-Colostate/Data/BVR")
 
 # IMPORT SIA DATA
 SIA_FISH <- read_csv("Meta_SIA_Data.csv")
+
+Sampling_dates <- read_csv("Sampling_dates.csv")
+
+Sampling_dates <- Sampling_dates %>%
+  mutate(Sampling_date = mdy(Sampling_date))
+
+
 problems()
+
 
 str(SIA_FISH)
 
@@ -22,6 +31,12 @@ SIA_FISH$Occasion <- factor(SIA_FISH$Occasion, levels = c("MAY_2021", "AUG_2021"
                                                  "MAY_2022", "AUG_2022", "OCT_2022",
                                                  "MAY_2023", "AUG_2023", "OCT_2023",
                                                  "MAY_2024", "AUG_2024", "OCT_2024"))
+
+
+
+SIA_FISH <- SIA_FISH %>%
+  left_join(Sampling_dates, by = c("Occasion", "Location"))
+
 
 # C:N vs d13C SCATTER PLOT
 ggplot(SIA_FISH, aes(x=CN, y=d13C)) +
@@ -205,3 +220,90 @@ ggplot(data_SIA_SIBER, aes(x = iso1, y = iso2, colour = group)) +
 
 
 # work on faceting by month and year
+
+
+
+
+
+
+
+
+
+### HYDROGRAPH
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(tidyverse)
+library(purrr)
+
+
+# RETRIEVING USGS GAUGE DATA
+install.packages("dataRetrieval", type = "source")
+library(dataRetrieval)
+packageVersion("dataRetrieval")  # should be >= 2.7.19
+
+
+# https://doi-usgs.github.io/dataRetrieval/reference/read_waterdata_daily.html
+# read_waterdata_daily is newer but not working here for some reason.....
+site <- "09057500"           # USGS site number (Blue River below Green Mountain)
+parameter_code <- "00060"    # Parameter code for discharge (ft³/s)
+statistic_id <- "00003"      # Statistic code for daily mean
+start_date <- "2021-01-01"
+end_date <- "2024-12-29"
+
+# Retrieve daily discharge data
+discharge_data <- read_waterdata_daily(
+  monitoring_location_id = site,
+  parameter_code = parameter_code,
+  statistic_id = statistic_id,
+  time = c(start_date, end_date)
+)
+
+
+# So using readNWISdv...it's older but works
+site <- "09057500"          # USGS site number
+parameterCd <- "00060"      # Discharge (cfs)
+statCd <- "00003"           # Daily mean
+startDate <- "2021-01-01"
+endDate <- "2024-12-29"
+
+# Retrieve daily values
+discharge_data <- readNWISdv(
+  siteNumbers = site,
+  parameterCd = parameterCd,
+  statCd = statCd,
+  startDate = startDate,
+  endDate = endDate
+)
+
+# Renaming columns
+
+discharge_data <- discharge_data %>%
+  rename(Discharge_cfs = X_00060_00003,
+         Qualifier = X_00060_00003_cd
+  )
+# A, P = data qualifiers (approved, provisional) for Qualifier
+
+
+ggplot(discharge_data, aes(x = Date, y = Discharge_cfs)) +
+  geom_line() +
+  geom_vline(
+    data = Sampling_dates,
+    aes(xintercept = Sampling_date),
+    color = "#70A494",
+    linetype = "solid"
+  ) +
+  labs(
+    x = "Date",
+    y = "Discharge (cfs)"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+class(discharge_data$Date)
+class(Sampling_dates$Sampling_date)
