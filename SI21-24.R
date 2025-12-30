@@ -27,38 +27,90 @@ problems()
 
 str(SIA_FISH)
 
+# Putting sampling occassions in order
 SIA_FISH$Occasion <- factor(SIA_FISH$Occasion, levels = c("MAY_2021", "AUG_2021", "OCT_2021",
                                                  "MAY_2022", "AUG_2022", "OCT_2022",
                                                  "MAY_2023", "AUG_2023", "OCT_2023",
                                                  "MAY_2024", "AUG_2024", "OCT_2024"))
 
 
-
+# Adding a sampling date column so it isn't just month/year 
+# better for linking with specific hydrograph patterns
 SIA_FISH <- SIA_FISH %>%
   left_join(Sampling_dates, by = c("Occasion", "Location"))
 
 
-# C:N vs d13C SCATTER PLOT
-ggplot(SIA_FISH, aes(x=CN, y=d13C)) +
+
+
+
+## PLOTTING----------------------------------------------------------------------
+
+# INORGANIC CARBON
+
+# First we want to test whether there is evidence for an effect of inorganic carbon
+# on the carbon isotope values. If this was a factor we would expect to see a 
+# positive relationship between %C and d13C. Why?
+
+# If you just use SIA_FISH the below graphs are hideous bc the bugs make it really
+# hard to differentiate facets, so here I filtered for just BNT and MTS
+SIA_JUST_FISH <- SIA_FISH %>%
+  filter(Species %in% c("BNT", "MTS"))
+
+SIA_JUST_FISH$Occasion <- factor(SIA_JUST_FISH$Occasion, levels = c("MAY_2021", "AUG_2021", "OCT_2021",
+                                                                    "MAY_2022", "AUG_2022", "OCT_2022",
+                                                                    "MAY_2023", "AUG_2023", "OCT_2023",
+                                                                    "MAY_2024", "AUG_2024", "OCT_2024"))
+
+
+ggplot(SIA_JUST_FISH, aes(x=C, y=d13C)) +
   geom_point() +
-  geom_smooth(method = "lm", se=T,formula=y~x) 
-  #facet_grid(Species ~ Occasion)
+  geom_smooth(method = "lm", se=T,formula=y~x) +
+  #facet_grid(Species ~ Month, scales = "free_x") 
+  facet_grid(Species ~  Occasion, scales = "free_x") 
+  #facet_grid(Species ~  Year, scales = "free_x")
+
+
+
+# LIPID EFFECTS
+
+# Lipids contain carbon but no nitrogen AND are 13C depleted relative to protein 
+# (i.e. muscle). So, lipid rich samples will be depleted in 13C (more negative delta 13C), in extreme cases 
+#this may bias our interpretation of their position in the food web.
+
+# Alternatively we can identify whether any individuals / populations have C:N 
+# values above the 3.5 threshold. If C:N value are mostly below 4, it is unlikely 
+# that lipids will influence the d13C values of most species.
+
+# C:N vs d13C SCATTER PLOT
+SIA_JUST_FISH <- SIA_JUST_FISH %>%
+  mutate(CN = as.numeric(CN))
+
+
+ggplot(SIA_JUST_FISH, aes(x = CN, y = d13C)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = T, color = "#70A494") +
+  facet_grid(Species ~ Occasion,  scales = "free_x")+
+  scale_x_continuous(n.breaks = 4) +
+  theme(
+    panel.grid = element_blank()
+  )
+
 
 # C:N BOXPLOT
-ggplot(SIA_FISH, aes(x=Species, group = Species, y=CN, colour=Species)) +
+ggplot(SIA_JUST_FISH, aes(x=Species, group = Species, y=CN, colour=Species)) +
   geom_boxplot() +
   geom_point(position="jitter", size = 0.75, shape = 1)+
   #ylim(3,5) +
-  geom_hline(aes(yintercept=4), colour="red") +
+  geom_hline(aes(yintercept=4), colour="#70A494") +
   facet_grid(. ~ Occasion) +
   theme_minimal()
 
 # PROPORTION OF FISH UNDER 3.5 C:N THRESHOLD
-SIA_FISH %>%
+SIA_JUST_FISH %>%
   summarize(proportion = sum(CN < 3.5) / n()) %>% 
   kable(caption = "% C:N < 3.5", 
         booktabs= T, 
-        digits=2) 
+        digits=2) # I think we are in the safe
 
 # MEAN C:N FOR BROWN TROUT & MOTTLED SCULPIN
 SIA_FISH %>%
@@ -72,6 +124,11 @@ SIA_FISH %>%
 
 
 
+  
+  
+  
+# NICHE OVERLAP FOR EACH OCCASION-----------------------------------------------
+
 # FORMAT FOR SIBER
 data_SIA_SIBER <- SIA_FISH %>%
   select(d13C, d15N, Species, Occasion) %>%
@@ -80,12 +137,7 @@ data_SIA_SIBER <- SIA_FISH %>%
          "group" = "Species",
          "community" = "Occasion") %>%
   filter(Species == "BNT", Species == "MTS")
-  as.data.frame()
-
-  
-  
-  
-# NICHE OVERLAP FOR EACH OCCASION-----------------------------------------------
+as.data.frame()
 
 # Prepare data in chronological order
 data_SIA_SIBER <- SIA_FISH %>%
@@ -130,15 +182,42 @@ ggplot(data_SIA_SIBER, aes(x = iso1, y = iso2, colour = group)) +
     legend.justification = c("right", "bottom")
   )
 
+# SUM STATS FOR EACH GROUP: TA, SEA & SEAc -----------
+# TA = Total Area = convex hull around all the data 
+# SEA = Standard Ellipse Area = 40% of the data 
+# SEAc = Standard Ellipse Area Corrected (small sample size corrected [< 20-30 individuals])
+group.ML <- groupMetricsML(SIA_SIBER_OBJECT)
+
+NICHE_WIDTHS <-group.ML %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("NICHE_AREA") %>%
+  pivot_longer(!NICHE_AREA, names_to = "GROUP", values_to = "NICHE_AREA_VALUES") %>%
+  separate(GROUP, into = c("COMMUNITY", "SPECIES"), sep = "\\.") %>%
+  separate(COMMUNITY, into = c("MONTH", "YEAR"), sep = "\\_") %>%
+  select(YEAR, MONTH, SPECIES, NICHE_AREA, NICHE_AREA_VALUES) %>%
+  pivot_wider(names_from = NICHE_AREA, values_from = NICHE_AREA_VALUES) %>%
+  mutate(
+    YEAR = factor(YEAR, levels = c("2021", "2022", "2023", "2024")),
+    MONTH = factor(MONTH, levels = c("MAY", "AUG", "OCT")))
+
+kable(NICHE_WIDTHS, caption = "ISOTOPIC NICHE AREAS", digits = 1, booktabs = T) 
 
 
+# PLOT
+ggplot(NICHE_WIDTHS, aes(x = MONTH, y = SEA, group = SPECIES)) +
+  geom_point(aes(color = SPECIES)) +
+  geom_line(aes(color = SPECIES)) +
+  facet_wrap(~YEAR) +
+  theme_minimal() +
+  ylab("SEA") +
+  theme(legend.title = element_blank(),
+        legend.position = "bottom",
+        axis.title.x = element_blank()) 
+
+# REMOVE
+rm(NICHE_WIDTHS)
 
 # NICHE OVERLAP FOR EACH YEAR-----------------------------------------------
-
-
-class(SIA_FISH)
-levels(SIA_FISH)
-str(SIA_FISH)
 
 
 # Prepare data in chronological order
@@ -229,7 +308,7 @@ ggplot(data_SIA_SIBER, aes(x = iso1, y = iso2, colour = group)) +
 
 
 
-### HYDROGRAPH
+### HYDROGRAPH------------------------------------------------------------
 
 library(ggplot2)
 library(dplyr)
