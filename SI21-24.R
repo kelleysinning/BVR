@@ -526,16 +526,37 @@ ggplot(data_SIA_SIBER, aes(x = iso1, y = iso2, colour = group)) +
 
 
 ### PLAYING AROUND
+NICHE_WIDTHS_BNT <- NICHE_WIDTHS %>% 
+  filter(SPECIES == "BNT")
+
+NICHE_WIDTHS_MTS <- NICHE_WIDTHS %>% 
+  filter(SPECIES == "MTS")
 
 
-model <- lmer(SEA ~ SPECIES  + (1|MONTH) + (1|YEAR),
-              data = NICHE_WIDTHS) 
 
+model <- lmer(SEA ~ MONTH + (1|YEAR),
+              data = NICHE_WIDTHS_BNT) 
 summary(model)
+
+model <- lmer(SEA ~ MONTH + (1|YEAR),
+              data = NICHE_WIDTHS_MTS) 
+summary(model)
+
+
 
 model <- lm(SEA ~ SPECIES,
             data = NICHE_WIDTHS) 
 summary(model)  
+
+
+anova_model <- aov(SEA ~ MONTH, data = NICHE_WIDTHS_BNT)
+summary(anova_model)
+TukeyHSD(anova_model)
+
+
+anova_model <- aov(SEA ~ MONTH, data = NICHE_WIDTHS)
+summary(anova_model)
+TukeyHSD(anova_model)
 
 ### HYDROGRAPH------------------------------------------------------------
 
@@ -615,3 +636,17 @@ ggplot(discharge_data, aes(x = Date, y = Discharge_cfs)) +
 
 class(discharge_data$Date)
 class(Sampling_dates$Sampling_date)
+
+
+
+# IS DISCHARGE RELATED TO ISOTOPE STUFF?---------------------------------------
+discharge_data <- discharge_data %>%
+  rename(Sampling_date = Date)
+
+
+SIA_FISH_DISCHARGE <- SIA_FISH %>%
+  left_join(discharge_data %>% select("Sampling_date", "Discharge_cfs"), by = c("Sampling_date"))
+
+
+
+
