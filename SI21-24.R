@@ -155,6 +155,7 @@ data_SIA_SIBER <- SIA_FISH %>%
   ) %>%
   as.data.frame()
 
+
 # Create Siber object
 SIA_SIBER_OBJECT <- createSiberObject(data_SIA_SIBER)
 
@@ -435,11 +436,6 @@ ggplot(OVERLAP_DF, aes(x = SEASON, y = OVERLAP, group = YEAR)) +
 
 
 
-
-
-
-
-
 # NICHE OVERLAP FOR EACH YEAR-----------------------------------------------
 
 
@@ -575,8 +571,8 @@ packageVersion("dataRetrieval")  # should be >= 2.7.19
 
 
 # https://doi-usgs.github.io/dataRetrieval/reference/read_waterdata_daily.html
-# read_waterdata_daily is newer but not working here for some reason.....
-site <- "09057500"           # USGS site number (Blue River below Green Mountain)
+# read_waterdata_daily is newer 
+site <- "USGS-09057500"           # USGS site number (Blue River below Green Mountain)
 parameter_code <- "00060"    # Parameter code for discharge (ft³/s)
 statistic_id <- "00003"      # Statistic code for daily mean
 start_date <- "2021-01-01"
@@ -638,15 +634,131 @@ class(discharge_data$Date)
 class(Sampling_dates$Sampling_date)
 
 
+# Function to compute 30-day stats for each sample, this works
+get_30day_stats <- function(Sampling_date, discharge_data) {
+  start_date <- Sampling_date - days(30)
+  subset <- discharge_data %>%
+    filter(Date > start_date & Date <= Sampling_date)
+  
+  mean_cfs <- mean(subset$Discharge_cfs, na.rm = TRUE)
+  cv_cfs <- sd(subset$Discharge_cfs, na.rm = TRUE) / mean_cfs
+  
+  return(c(mean_30d = mean_cfs, cv_30d = cv_cfs))
+}
+
+# Apply function to each sample
+stats_matrix <- t(sapply(Sampling_dates$Sampling_date, get_30day_stats, discharge_data = discharge_data))
+
+# Combine with Sampling_dates of each SI occasion so we know the mean 30d discharge prior to sampling
+Sampling_datess <- cbind(Sampling_dates, stats_matrix)
+
+
 
 # IS DISCHARGE RELATED TO ISOTOPE STUFF?---------------------------------------
-discharge_data <- discharge_data %>%
-  rename(Sampling_date = Date)
+
+#discharge_data <- discharge_data %>%
+ # rename(Sampling_date = Date)
 
 
-SIA_FISH_DISCHARGE <- SIA_FISH %>%
-  left_join(discharge_data %>% select("Sampling_date", "Discharge_cfs"), by = c("Sampling_date"))
+#SIA_FISH_DISCHARGE <- SIA_FISH %>%
+ # left_join(discharge_data %>% select("Sampling_date", "Discharge_cfs"), by = c("Sampling_date"))
+
+# Putting the df in chronological order
+NICHE_WIDTHS <- NICHE_WIDTHS %>%
+  mutate(
+    MONTH_NUM = match(MONTH, c("MAY", "AUG", "OCT")),   # convert month to number
+    YEAR = as.numeric(as.character(YEAR))               # ensure YEAR is numeric
+  ) %>%
+  arrange(YEAR, MONTH_NUM) %>%                          # sort by year then month
+  select(-MONTH_NUM)                                    # drop temporary column
 
 
+# Adding a column for sample dates so it can be left joined with mean_30d discharge prior to first
+# sampling day of each occasion to see if there's a relationship with niche widths and flow
+NICHE_WIDTHS <- NICHE_WIDTHS %>%
+  mutate(Sampling_date = (c("2021-05-24", "2021-05-24","2021-08-02","2021-08-02", "2021-10-10","2021-10-10",
+         "2022-05-23", "2022-05-23", "2022-08-01", "2022-08-01", "2022-10-10", "2022-10-10", "2023-05-15",
+         "2023-05-15", "2023-08-07", "2023-08-07", "2023-10-09", "2023-10-09", "2024-05-13", "2024-05-13",
+         "2024-07-29", "2024-07-29", "2024-10-07", "2024-10-07")))
+
+NICHE_WIDTHS_BNT <- NICHE_WIDTHS_BNT %>%
+  mutate(Sampling_date = (c( "2021-05-24","2021-08-02", "2021-10-10",
+                             "2022-05-23", "2022-08-01", "2022-10-10", 
+                            "2023-05-15", "2023-08-07", "2023-10-09", 
+                            "2024-05-13", "2024-07-29", "2024-10-07")))
+
+NICHE_WIDTHS_MTS <- NICHE_WIDTHS_MTS %>%
+  mutate(Sampling_date = (c( "2021-05-24","2021-08-02", "2021-10-10",
+                             "2022-05-23", "2022-08-01", "2022-10-10", 
+                             "2023-05-15", "2023-08-07", "2023-10-09", 
+                             "2024-05-13", "2024-07-29", "2024-10-07")))
+                          
+                          
+NICHE_WIDTHS$Sampling_date   <- as.Date(NICHE_WIDTHS$Sampling_date)
+NICHE_WIDTHS_BNT$Sampling_date   <- as.Date(NICHE_WIDTHS_BNT$Sampling_date)
+NICHE_WIDTHS_MTS$Sampling_date   <- as.Date(NICHE_WIDTHS_MTS$Sampling_date)
+Sampling_datess$Sampling_date <- as.Date(Sampling_datess$Sampling_date)
 
 
+NICHE_WIDTHS_DISCHARGE <- NICHE_WIDTHS %>%
+  left_join(Sampling_datess %>% select("Sampling_date", "mean_30d"), by = c("Sampling_date"))
+
+NICHE_WIDTHS_BNT_DISCHARGE <- NICHE_WIDTHS_BNT %>%
+  left_join(Sampling_datess %>% select("Sampling_date", "mean_30d"), by = c("Sampling_date"))
+
+NICHE_WIDTHS_MTS_DISCHARGE <- NICHE_WIDTHS_MTS %>%
+  left_join(Sampling_datess %>% select("Sampling_date", "mean_30d"), by = c("Sampling_date"))
+
+model <- lmer(SEA ~ mean_30d + (1|MONTH) + (1|YEAR),
+              data = NICHE_WIDTHS_DISCHARGE) 
+summary(model)
+
+
+model <- lm(SEA ~ mean_30d, data = NICHE_WIDTHS_DISCHARGE)
+summary(model)
+
+
+model <- lm(SEA ~ mean_30d, data = NICHE_WIDTHS_BNT_DISCHARGE)
+summary(model)
+
+
+model <- lm(SEA ~ mean_30d, data = NICHE_WIDTHS_MTS_DISCHARGE)
+summary(model)
+
+
+# It seems like the 30 days leading up to the first day of sampling was not a 
+# significant factor in niche widths of BNT and MTS
+
+
+# How about overlap?
+# Putting the df in chronological order
+OVERLAP_DF <- OVERLAP_DF %>%
+  mutate(
+    MONTH_NUM = match(SEASON, c("MAY", "AUG", "OCT")),   # convert month to number
+    YEAR = as.numeric(as.character(YEAR))               # ensure YEAR is numeric
+  ) %>%
+  arrange(YEAR, MONTH_NUM) %>%                          # sort by year then month
+  select(-MONTH_NUM)                                    # drop temporary column
+
+
+OVERLAP_DF <- OVERLAP_DF %>%
+  mutate(Sampling_date = (c( "2021-05-24","2021-08-02", "2021-10-10",
+                             "2022-05-23", "2022-08-01", "2022-10-10", 
+                             "2023-05-15", "2023-08-07", "2023-10-09", 
+                             "2024-05-13", "2024-07-29", "2024-10-07")))
+
+OVERLAP_DF$Sampling_date   <- as.Date(OVERLAP_DF$Sampling_date)
+
+OVERLAP_DF_DISCHARGE <- OVERLAP_DF %>%
+  left_join(Sampling_datess %>% select("Sampling_date", "mean_30d"), by = c("Sampling_date"))
+
+model <- lm(OVERLAP ~ mean_30d, data = OVERLAP_DF_DISCHARGE)
+summary(model)
+
+# nope
+
+library(readr)
+
+write_csv(discharge_data, "SI_discharge.csv")
+write_csv(NICHE_WIDTHS, "NICHE_WIDTHS_21to24.csv")
+write_csv(OVERLAP_DF, "OVERLAP.csv")
