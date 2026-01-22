@@ -40,7 +40,7 @@ discharge_data_ <- discharge_data_ %>%
 site <- "09057500"          # USGS site number
 parameterCd <- "00060"      # Discharge (cfs)
 statCd <- "00003"           # Daily mean
-startDate <- "2022-10-01"
+startDate <- "2021-01-01"
 endDate <- "2026-01-01"
 
 # Retrieve daily values
@@ -765,5 +765,10 @@ ggplot() +
   ) +
   
   scale_x_date(name = "Date") +
-  theme_bw()
+  theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    panel.grid.minor = element_blank()
+    #axis.line = element_line(color = "black")
+  )
 
