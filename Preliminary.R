@@ -15,28 +15,33 @@ packageVersion("dataRetrieval")  # should be >= 2.7.19
 
 
 # https://doi-usgs.github.io/dataRetrieval/reference/read_waterdata_daily.html
-# read_waterdata_daily is newer but not working here for some reason.....
-site <- "09057500"           # USGS site number (Blue River below Green Mountain)
+# read_waterdata_daily is newer 
+site <- "USGS-09057500"  # USGS site number (Blue River below Green Mountain)
 parameter_code <- "00060"    # Parameter code for discharge (ft³/s)
 statistic_id <- "00003"      # Statistic code for daily mean
-start_date <- "2022-12-01"
+start_date <- "2022-10-01"
 end_date <- "2025-01-29"
 
 # Retrieve daily discharge data
-discharge_data <- read_waterdata_daily(
+discharge_data_ <- read_waterdata_daily(
   monitoring_location_id = site,
   parameter_code = parameter_code,
   statistic_id = statistic_id,
-  time = c(start_date, end_date)
+  time = c(start_date, end_date),
+  skipGeometry = TRUE,
 )
+
+discharge_data_ <- discharge_data_ %>%
+  select(time, value, approval_status)
 
 
 # So using readNWISdv...it's older but works
+# More results than read_waterdata_dailybecause it includes provisional data
 site <- "09057500"          # USGS site number
 parameterCd <- "00060"      # Discharge (cfs)
 statCd <- "00003"           # Daily mean
 startDate <- "2022-10-01"
-endDate <- "2025-09-29"
+endDate <- "2026-01-01"
 
 # Retrieve daily values
 discharge_data <- readNWISdv(
@@ -53,15 +58,17 @@ discharge_data <- discharge_data %>%
   rename(Discharge_cfs = X_00060_00003,
          Qualifier = X_00060_00003_cd
   )
+
  # A, P = data qualifiers (approved, provisional) for Qualifier
 
 # BRINGING IN ALGAE DATA-------------------------------------------------------
 # to merge with discharge
 setwd("/Users/kelleysinning/Library/CloudStorage/OneDrive-Colostate/Data/BVR")
-didymo_benthotorch <- read.csv("ALL_bentho_core.csv")
+didymo_benthotorch <- read.csv("ALL_bentho_core_.csv")
 didymo_benthotorch <- didymo_benthotorch %>%
   filter(!is.na(Sampling_date)) # removing NA columns that arose from comments in the csv
 
+str(didymo_benthotorch)
 # Making sure date formats are the same
 didymo_benthotorch$Sampling_date <- as.Date(didymo_benthotorch$Sampling_date)  
 discharge_data$Date <- as.Date(discharge_data$Date)
@@ -83,12 +90,14 @@ sample_dates <- c(
   "2024-07-24", "2024-07-29", "2024-07-30", "2024-07-31", "2024-08-01", "2024-08-02",
   "2024-08-13", "2024-09-26", "2024-10-26", "2024-11-14", "2025-01-16", "2025-03-11",
   "2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23", "2025-06-10",
-  "2025-06-18", "2025-07-30", "2025-08-27"
+  "2025-06-18", "2025-07-30", "2025-08-27", "2025-09-23", "2025-10-20","2025-10-22", 
+  "2025-10-21", "2025-10-19", "2025-11-14", "2025-12-15"
 )
 
 velocity_dates <- c("2024-07-24", "2024-08-13", "2024-09-26", "2024-10-26", "2024-11-14", "2025-01-16",
                     "2025-03-11", "2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23",
-                    "2025-06-10", "2025-07-30", "2025-08-27") # These additional dates have paired velocity
+                    "2025-06-10", "2025-07-30", "2025-08-27", "2025-09-23", "2025-10-20","2025-10-22", 
+                    "2025-10-21", "2025-10-19", "2025-11-14", "2025-12-15") # These additional dates have paired velocity
 
 
 # Convert to Date
@@ -102,7 +111,7 @@ discharge_data <- discharge_data %>%
 
 discharge_data <- discharge_data %>%
   filter(Date >= as.Date("2023-01-01") &
-           Date <= as.Date("2025-09-01"))
+           Date <= as.Date("2026-01-01"))
 
 
 # Filter just the sampling dates for vertical lines
@@ -191,7 +200,7 @@ algae_long <- avg_didymo_benthotorch %>%
 # Plotting
 library(rcartocolor)
 display_carto_all()
-carto_pal(7, "Temps")
+carto_pal(7, "Geyser")
 
 # First, ordering things how I like
 algae_long$Algae_Type <- factor(algae_long$Algae_Type, levels = c("Green", "Cyano", "Diatoms"))
@@ -626,4 +635,135 @@ summary(model)
 anova(model)
 
 
+### DIDYMO OVER TIME---------------------------------------------------
+
+# Pivot your algae columns to long format
+
+didymo_over_time <- didymo_benthotorch %>%
+  pivot_longer(
+    cols = c(Cyano, Green, Diatoms),   # the algae columns
+    names_to = "Algae_Type",
+    values_to = "Concentration"
+  ) %>%
+  filter(Algae_Type == "Diatoms")
+
+didymo_over_time <- didymo_over_time %>%
+  mutate(
+    Concentration = as.numeric(Concentration)
+  )%>%
+  filter(!is.na(Concentration)) # removing NA and making conc. numeric
+
+str(didymo_over_time)
+ggplot(didymo_over_time, aes(x = Sampling_date, y = Concentration, fill = Algae_Type)) +
+  geom_boxplot(position = position_dodge(width = 0.8)) +  
+  labs(
+    x = "Date",
+    y = "Algae Concentration",
+    fill = "Algae Type"
+  ) +
+  scale_fill_manual(
+    values = c("Green" = "#70A494", "Cyano" = "#DE8A5A", "Diatoms" = "#2887A1"), 
+    name = "Algae Type") + 
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  
+    legend.position = "top"
+  ) # make sure date is a character to run this right
+
+
+
+# Overlaying with hydrology
+
+str(discharge_data)
+
+didymo_over_time <- didymo_over_time %>%
+  mutate(Sampling_date = as.Date(Sampling_date))
+
+scale_factor <- 0.01
+
+ggplot() +
+  ## Hydrograph (scaled)
+  geom_line(
+    data = discharge_data,
+    aes(x = Date, y = Discharge_cfs * scale_factor),
+    color = "grey40",
+    linewidth = 0.8
+  ) +
+  
+  ## Boxplots (grouped by sampling date)
+  geom_boxplot(
+    data = didymo_over_time,
+    aes(x = Sampling_date,
+        y = Concentration,
+        group = Sampling_date),
+    width = 3,
+    fill = "#2887A1",
+    color = "#008080",
+    alpha = 0.7
+  ) +
+  
+  ## Primary axis: concentration
+  scale_y_continuous(
+    name = expression("Diatom concentration (" * mu * "g " * "chl-a" / cm^2 * ")"),
+    sec.axis = sec_axis(
+      transform = ~ . / scale_factor,  # <-- must provide function
+      name = "Discharge (CFS)"
+    )
+  ) +
+  
+  scale_x_date(name = "Date") +
+  theme_bw()
+
+
+
+str(didymo_over_time)
+
+
+# Overlaying with SI
+Sampling_dates <- read_csv("Sampling_dates.csv")
+
+Sampling_dates <- Sampling_dates %>%
+  mutate(Sampling_date = mdy(Sampling_date))
+
+ggplot() +
+  # SI
+  geom_vline(
+    data = Sampling_dates,
+    aes(xintercept = Sampling_date),
+    color = "grey70",
+    linetype = "dashed",
+    linewidth = 0.3
+  ) +
+  
+  ## Hydrograph (scaled)
+  geom_line(
+    data = discharge_data,
+    aes(x = Date, y = Discharge_cfs * scale_factor),
+    color = "grey40",
+    linewidth = 0.8
+  ) +
+
+  ## Boxplots (grouped by sampling date)
+  geom_boxplot(
+    data = didymo_over_time,
+    aes(x = Sampling_date,
+        y = Concentration,
+        group = Sampling_date),
+    width = 3,
+    fill = "#2887A1",
+    color = "#008080",
+    alpha = 0.7
+  ) +
+  
+  ## Primary axis: concentration
+  scale_y_continuous(
+    name = expression("Diatom concentration (" * mu * "g " * "chl-a" / cm^2 * ")"),
+    sec.axis = sec_axis(
+      transform = ~ . / scale_factor,  # <-- must provide function
+      name = "Discharge (CFS)"
+    )
+  ) +
+  
+  scale_x_date(name = "Date") +
+  theme_bw()
 

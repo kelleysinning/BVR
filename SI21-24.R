@@ -591,7 +591,7 @@ discharge_data <- read_waterdata_daily(
 site <- "09057500"          # USGS site number
 parameterCd <- "00060"      # Discharge (cfs)
 statCd <- "00003"           # Daily mean
-startDate <- "2021-01-01"
+startDate <- "2020-01-01"
 endDate <- "2024-12-29"
 
 # Retrieve daily values
@@ -759,6 +759,8 @@ summary(model)
 
 library(readr)
 
+
+# for sliding window
 write_csv(discharge_data, "SI_discharge.csv")
 write_csv(NICHE_WIDTHS, "NICHE_WIDTHS_21to24.csv")
 write_csv(OVERLAP_DF, "OVERLAP.csv")
