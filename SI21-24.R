@@ -171,16 +171,23 @@ ggplot(data_SIA_SIBER, aes(x = iso1, y = iso2, colour = group)) +
   geom_point(size = 1.5, shape = 1) +
   stat_ellipse(position="identity", geom = "polygon", aes(fill = group), level=0.4, linewidth = 1, alpha = 0.25) +
   stat_ellipse(position="identity", level=0.95, linewidth=0.5, linetype = 2) +
-  facet_wrap(. ~ community, ncol = 3, nrow = 4) +
+  #facet_wrap(. ~ community, ncol = 3, nrow = 4) +
+  facet_wrap(. ~ community, ncol = 3, nrow = 4, scales = "free") +
   xlab(expression(paste(delta^{13}, "C (\u2030)"))) +
   ylab(expression(paste(delta^{15}, "N (\u2030)"))) +
   scale_color_manual(values = c("#008080", "#DE8A5A")) +
   scale_fill_manual(values = c("#008080", "#DE8A5A")) +
   theme_bw() +
   theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
     legend.title = element_blank(),
-    legend.position = c(0.95, 0.05),
-    legend.justification = c("right", "bottom")
+    legend.position = c(0.99, 0.01),
+    legend.justification = c("right", "bottom"),
+    legend.text = element_text(size = 8), # smaller legend text
+    legend.key.size = unit(0.4, "cm"),    # smaller legend boxes
+    legend.background = element_rect(fill = "transparent", color = NA),
+    legend.key = element_rect(fill = "transparent", color = NA)
   )
 
 # SUM STATS FOR EACH GROUP: TA, SEA & SEAc -----------
@@ -514,11 +521,6 @@ ggplot(data_SIA_SIBER, aes(x = iso1, y = iso2, colour = group)) +
     legend.position = c(0.95, 0.05),
     legend.justification = c("right", "bottom")
   )
-
-
-
-# work on faceting by month and year
-
 
 
 ### PLAYING AROUND

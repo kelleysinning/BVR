@@ -771,4 +771,7 @@ ggplot() +
     panel.grid.minor = element_blank()
     #axis.line = element_line(color = "black")
   )
-
+library(rcartocolor)
+install.packages(rcartocolor)
+mycolors <- carto_pal(7, "Earth")
+mycolors
