@@ -1,4 +1,5 @@
-# BVR SI Data for Kelley Sinning from May 2021 to present
+# BVR SI Fish Data for Kelley Sinning from May 2021 to present
+# Focusing on isotopic niche overlap between MTS and BNT
 
 # Load packages
 library(tidyverse)
