@@ -42,12 +42,23 @@ SIA_ALL <- SIA_ALL %>%
 head(SIA_ALL)
 
 SIA_ALL <- SIA_ALL %>%
-  select(d13C, d15N, Species) %>%
+  select(d13C, d15N, Species, Occasion, Location) %>%
   drop_na()
 
+str(SIA_ALL)
 
-SIA_matrix <- SIA_ALL %>%
-  select(d13C, d15N)  # add more isotopes here if you have them
+# Taking average so it is a lot cleaner
+SIA_avg <- SIA_ALL %>%
+  group_by(Location, Occasion, Species) %>%
+  summarise(
+    d13C = mean(d13C, na.rm = TRUE),
+    d15N = mean(d15N, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+
+SIA_matrix <- SIA_avg %>%
+  select(d13C, d15N)  
   #scale()                  # important: standardize isotopes
 
 set.seed(123)  # reproducibility
@@ -66,18 +77,25 @@ NMDS_SIA
 scores_nmds <- as.data.frame(scores(NMDS_SIA))
 
 scores_nmds <- scores_nmds %>%
-  bind_cols(SIA_ALL %>% select(Species))
+  bind_cols(SIA_avg %>% select(Species, Occasion, Location))%>%
+  drop_na()
 
-ggplot(scores_nmds, aes(x = NMDS1, y = NMDS2, color = Taxon)) +
+scores_nmds_clean <- scores_nmds %>%
+  filter(!Species %in% c("Macroinvert", "Misc.", "Composite")) %>%
+  mutate(Species = if_else(Species == "FRY", "Fry", Species))
+
+
+ggplot(scores_nmds_clean, aes(x = NMDS1, y = NMDS2, color = Species)) +
+  facet_wrap(~Occasion, scales = "free_y") +
   geom_point(size = 3, alpha = 0.8) +
-  stat_ellipse(aes(fill = Taxon),
+  stat_ellipse(aes(fill = Species),
                geom = "polygon",
                alpha = 0.2,
                color = NA) +
   theme_classic() +
   labs(
     title = "NMDS of Stable Isotope Space",
-    subtitle = paste("Stress =", round(nmds_iso$stress, 3)),
+    subtitle = paste("Stress =", round(NMDS_SIA$stress, 3)),
     x = "NMDS1",
     y = "NMDS2"
   )

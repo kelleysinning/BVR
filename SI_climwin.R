@@ -35,10 +35,11 @@ SlidWin <- slidingwin(xvar = list(climate = discharge_data$Discharge_cfs),
                       #baseline = lm(Concentration ~ 1, data = diatoms_discharge), # no random effects
                       baseline = lme4::lmer(OVERLAP ~ 1 + (1|SEASON), data = OVERLAP),
                       cinterval = "day", # can also be weeks or months
-                      range = c(30, 0), # can customize this to as many days out from biological sample day as you want
+                      range = c(365, 0), # can customize this to as many days out from biological sample day as you want
                       type = "relative", # bc we have no specific day in mind as a reference day
                       stat = c("max","mean"), # can choose if you want means or maxes or both
                       func = "lin") # can also do quadratic (“quad”), cubic (“cub”), 
+
 # logarithmic (“log”) and inverse (“inv”)
 
 
@@ -95,7 +96,7 @@ SlidWin_rand <- randwin(repeats = 5,
                         #baseline = lm(Concentration ~ 1, data = diatoms_discharge),
                         baseline = lme4::lmer(OVERLAP ~ 1 + (1|SEASON), data = OVERLAP),
                         cinterval = "day",
-                        range = c(30, 0),
+                        range = c(365, 0),
                         type = "relative", 
                         stat = c("mean", "max"), 
                         func = "lin")
