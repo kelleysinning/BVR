@@ -30,7 +30,7 @@ Sampling_dates <- Sampling_dates %>%
 SIA_ALL$Occasion <- factor(SIA_ALL$Occasion, levels = c("MAY_2021", "AUG_2021", "OCT_2021",
                                                           "MAY_2022", "AUG_2022", "OCT_2022",
                                                           "MAY_2023", "AUG_2023", "OCT_2023",
-                                                          "MAY_2024", "AUG_2024", "OCT_2024"))
+                                                          "MAY_2024", "AUG_2024", "OCT_2024", "Unknown"))
 
 
 # Adding a sampling date column so it isn't just month/year 
@@ -57,7 +57,7 @@ SIA_avg <- SIA_ALL %>%
   )
 
 
-SIA_matrix <- SIA_avg %>%
+SIA_matrix <- SIA_avg %>% # Use SIA_ALL if you want chaos
   select(d13C, d15N)  
   #scale()                  # important: standardize isotopes
 
@@ -78,17 +78,24 @@ scores_nmds <- as.data.frame(scores(NMDS_SIA))
 
 scores_nmds <- scores_nmds %>%
   bind_cols(SIA_avg %>% select(Species, Occasion, Location))%>%
-  drop_na()
+  drop_na() 
 
 scores_nmds_clean <- scores_nmds %>%
-  filter(!Species %in% c("Macroinvert", "Misc.", "Composite")) %>%
-  mutate(Species = if_else(Species == "FRY", "Fry", Species))
+  #filter(!Species %in% c("Macroinvert", "Misc.", "Composite")) %>% # blank this 
+    # out for family resolution only
+  mutate(Species = if_else(Species == "FRY", "Fry", Species))  %>%
+  mutate(Group = case_when(
+    Species %in% c("BNT", "MTS", "Algae") ~ Species,
+    TRUE ~ "Macro"
+  ))
 
 
-ggplot(scores_nmds_clean, aes(x = NMDS1, y = NMDS2, color = Species)) +
+
+
+ggplot(scores_nmds_clean, aes(x = NMDS1, y = NMDS2, color = Group)) +
   facet_wrap(~Occasion, scales = "free_y") +
   geom_point(size = 3, alpha = 0.8) +
-  stat_ellipse(aes(fill = Species),
+  stat_ellipse(aes(fill = Group),
                geom = "polygon",
                alpha = 0.2,
                color = NA) +
