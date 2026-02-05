@@ -166,14 +166,22 @@ data_SIA_SIBER$community <- factor(data_SIA_SIBER$community, levels = c("MAY_202
                                                                         "MAY_2023", "AUG_2023", "OCT_2023",
                                                                         "MAY_2024", "AUG_2024", "OCT_2024"))
 
+data_SIA_SIBER$community <- factor(data_SIA_SIBER$community, levels = c("MAY_2021", "MAY_2022","MAY_2023","MAY_2024",
+                                                                        "AUG_2021", "AUG_2022","AUG_2023","AUG_2024",
+                                                                        "OCT_2021", "OCT_2022","OCT_2023","OCT_2024"))
+
+
+
+
+
 # SIBER PLOT
 
 ggplot(data_SIA_SIBER, aes(x = iso1, y = iso2, colour = group)) +
   geom_point(size = 1.5, shape = 1) +
   stat_ellipse(position="identity", geom = "polygon", aes(fill = group), level=0.4, linewidth = 1, alpha = 0.25) +
   stat_ellipse(position="identity", level=0.95, linewidth=0.5, linetype = 2) +
-  #facet_wrap(. ~ community, ncol = 3, nrow = 4) +
-  facet_wrap(. ~ community, ncol = 3, nrow = 4, scales = "free") +
+  facet_wrap2(. ~ community, ncol = 4, nrow = 3, scales = "free") +
+  #facet_wrap(. ~ community, ncol = 3, nrow = 4, scales = "free") + Use this for first order option
   xlab(expression(paste(delta^{13}, "C (\u2030)"))) +
   ylab(expression(paste(delta^{15}, "N (\u2030)"))) +
   scale_color_manual(values = c("#008080", "#DE8A5A")) +

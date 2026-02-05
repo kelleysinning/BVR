@@ -30,7 +30,7 @@ Sampling_dates <- Sampling_dates %>%
 SIA_ALL$Occasion <- factor(SIA_ALL$Occasion, levels = c("MAY_2021", "AUG_2021", "OCT_2021",
                                                           "MAY_2022", "AUG_2022", "OCT_2022",
                                                           "MAY_2023", "AUG_2023", "OCT_2023",
-                                                          "MAY_2024", "AUG_2024", "OCT_2024", "Unknown"))
+                                                          "MAY_2024", "AUG_2024", "OCT_2024")) # include "Unknown if you want to see the algae point
 
 
 # Adding a sampling date column so it isn't just month/year 
@@ -40,6 +40,7 @@ SIA_ALL <- SIA_ALL %>%
 
 # NMDS----------------------------------------------------------------------------
 head(SIA_ALL)
+
 
 SIA_ALL <- SIA_ALL %>%
   select(d13C, d15N, Species, Occasion, Location) %>%
@@ -76,6 +77,7 @@ NMDS_SIA
 
 scores_nmds <- as.data.frame(scores(NMDS_SIA))
 
+
 scores_nmds <- scores_nmds %>%
   bind_cols(SIA_avg %>% select(Species, Occasion, Location))%>%
   drop_na() 
@@ -85,7 +87,7 @@ scores_nmds_clean <- scores_nmds %>%
     # out for family resolution only
   mutate(Species = if_else(Species == "FRY", "Fry", Species))  %>%
   mutate(Group = case_when(
-    Species %in% c("BNT", "MTS", "Algae", "Fry", "Fish Eggs") ~ Species,
+    Species %in% c("BNT", "MTS", "Fry", "Fish Eggs") ~ Species,
     TRUE ~ "Macro"
   ))
 
@@ -108,7 +110,18 @@ ggplot(scores_nmds, aes(x = NMDS1, y = NMDS2, color = Species)) +
 
 library(rcartocolor)
 display_carto_all()
-mycolors <- carto_pal(6, "Antique")
+mycolors <- carto_pal(9, "Geyser")
+mycolors
+
+species_colors <- c(
+  "BNT" = "#008080",
+  "MTS"   = "#DE8A5A",
+  "Macro" = "#92B69E",
+  "Algae"        = "#798234",
+  "Fish Eggs"  = "#6C8EBF",
+  "Fry" = "#DC869A"
+)
+
 
 ggplot(scores_nmds_clean, aes(x = NMDS1, y = NMDS2, color = Group)) +
   facet_wrap(~Occasion, scales = "free_y") +
@@ -117,8 +130,8 @@ ggplot(scores_nmds_clean, aes(x = NMDS1, y = NMDS2, color = Group)) +
                geom = "polygon",
                alpha = 0.2,
                color = NA) +
-  scale_color_manual(values = mycolors) +
-  scale_fill_manual(values = mycolors) +
+  scale_color_manual(values = species_colors) +
+  scale_fill_manual(values = species_colors) +
   theme_classic() +
   labs(
     title = "NMDS of Stable Isotope Space",

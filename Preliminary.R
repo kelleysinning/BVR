@@ -729,11 +729,26 @@ ggplot() +
   # SI
   geom_vline(
     data = Sampling_dates,
-    aes(xintercept = Sampling_date),
-    color = "grey70",
+    aes(xintercept = Sampling_date, color = Occasion), 
     linetype = "dashed",
     linewidth = 0.3
   ) +
+  scale_color_manual(values = c( # For better visuals on poster
+    MAY_2021 = "#B4C8A8",
+    MAY_2022 = "#B4C8A8",
+    MAY_2023 = "#B4C8A8",
+    MAY_2024 = "#B4C8A8",
+    MAY_2025 = "#B4C8A8",
+    AUG_2021 = "#EDBB8A",
+    AUG_2022 = "#EDBB8A",
+    AUG_2023 = "#EDBB8A",
+    AUG_2024 = "#EDBB8A",
+    AUG_2025 = "#EDBB8A",
+    OCT_2021 = "#DE8A5A",
+    OCT_2022 = "#DE8A5A",
+    OCT_2023 = "#DE8A5A",
+    OCT_2024 = "#DE8A5A",
+    OCT_2025 = "#DE8A5A")) +
   
   ## Hydrograph (scaled)
   geom_line(
