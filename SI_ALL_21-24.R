@@ -85,12 +85,30 @@ scores_nmds_clean <- scores_nmds %>%
     # out for family resolution only
   mutate(Species = if_else(Species == "FRY", "Fry", Species))  %>%
   mutate(Group = case_when(
-    Species %in% c("BNT", "MTS", "Algae") ~ Species,
+    Species %in% c("BNT", "MTS", "Algae", "Fry", "Fish Eggs") ~ Species,
     TRUE ~ "Macro"
   ))
 
 
 
+ggplot(scores_nmds, aes(x = NMDS1, y = NMDS2, color = Species)) +
+  facet_wrap(~Occasion, scales = "free_y") +
+  geom_point(size = 3, alpha = 0.8) +
+  stat_ellipse(aes(fill = Species),
+               geom = "polygon",
+               alpha = 0.2,
+               color = NA) +
+  theme_classic() +
+  labs(
+    title = "NMDS of Stable Isotope Space",
+    subtitle = paste("Stress =", round(NMDS_SIA$stress, 3)),
+    x = "NMDS1",
+    y = "NMDS2"
+  )
+
+library(rcartocolor)
+display_carto_all()
+mycolors <- carto_pal(6, "Antique")
 
 ggplot(scores_nmds_clean, aes(x = NMDS1, y = NMDS2, color = Group)) +
   facet_wrap(~Occasion, scales = "free_y") +
@@ -99,6 +117,8 @@ ggplot(scores_nmds_clean, aes(x = NMDS1, y = NMDS2, color = Group)) +
                geom = "polygon",
                alpha = 0.2,
                color = NA) +
+  scale_color_manual(values = mycolors) +
+  scale_fill_manual(values = mycolors) +
   theme_classic() +
   labs(
     title = "NMDS of Stable Isotope Space",
