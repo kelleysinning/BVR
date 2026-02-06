@@ -93,6 +93,11 @@ scores_nmds_clean <- scores_nmds %>%
 
 
 
+scores_nmds_clean$Occasion <- factor(scores_nmds_clean$Occasion, levels = c("MAY_2021", "MAY_2022","MAY_2023","MAY_2024",
+                                                                        "AUG_2021", "AUG_2022","AUG_2023","AUG_2024",
+                                                                        "OCT_2021", "OCT_2022","OCT_2023","OCT_2024"))
+
+
 ggplot(scores_nmds, aes(x = NMDS1, y = NMDS2, color = Species)) +
   facet_wrap(~Occasion, scales = "free_y") +
   geom_point(size = 3, alpha = 0.8) +
