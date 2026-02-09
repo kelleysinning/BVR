@@ -19,8 +19,8 @@ packageVersion("dataRetrieval")  # should be >= 2.7.19
 site <- "USGS-09057500"  # USGS site number (Blue River below Green Mountain)
 parameter_code <- "00060"    # Parameter code for discharge (ft³/s)
 statistic_id <- "00003"      # Statistic code for daily mean
-start_date <- "2022-10-01"
-end_date <- "2025-01-29"
+start_date <- "2021-01-01"
+end_date <- "2026-01-01"
 
 # Retrieve daily discharge data
 discharge_data_ <- read_waterdata_daily(
