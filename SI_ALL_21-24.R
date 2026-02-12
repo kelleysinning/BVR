@@ -48,9 +48,21 @@ SIA_ALL <- SIA_ALL %>%
 
 str(SIA_ALL)
 
+SIA_ALL_clean <- SIA_ALL %>% # Eliminating a bunch of family bug variation in permanova
+  select(d13C, d15N, Species, Occasion, Location) %>%
+  mutate(Species = if_else(Species == "FRY", "Fry", Species)) %>%
+  mutate(
+    Group = case_when(
+      Species %in% c("BNT", "MTS", "Fry", "Fish Eggs") ~ Species,
+      TRUE ~ "Macro"
+    )
+  ) %>%
+  drop_na()
+
+
 # Taking average so it is a lot cleaner
-SIA_avg <- SIA_ALL %>%
-  group_by(Location, Occasion, Species) %>%
+SIA_avg <- SIA_ALL_clean %>%
+  group_by(Location, Occasion, Group) %>% # change from group to species if using SIA_ALL
   summarise(
     d13C = mean(d13C, na.rm = TRUE),
     d15N = mean(d15N, na.rm = TRUE),
@@ -79,39 +91,15 @@ scores_nmds <- as.data.frame(scores(NMDS_SIA))
 
 
 scores_nmds <- scores_nmds %>%
-  bind_cols(SIA_avg %>% select(Species, Occasion, Location))%>%
+  bind_cols(SIA_avg %>% select(Group, Occasion, Location))%>%
   drop_na() 
 
-scores_nmds_clean <- scores_nmds %>%
-  #filter(!Species %in% c("Macroinvert", "Misc.", "Composite")) %>% # blank this 
-    # out for family resolution only
-  mutate(Species = if_else(Species == "FRY", "Fry", Species))  %>%
-  mutate(Group = case_when(
-    Species %in% c("BNT", "MTS", "Fry", "Fish Eggs") ~ Species,
-    TRUE ~ "Macro"
-  ))
 
 
-
-scores_nmds_clean$Occasion <- factor(scores_nmds_clean$Occasion, levels = c("MAY_2021", "MAY_2022","MAY_2023","MAY_2024",
+scores_nmds$Occasion <- factor(scores_nmds$Occasion, levels = c("MAY_2021", "MAY_2022","MAY_2023","MAY_2024",
                                                                         "AUG_2021", "AUG_2022","AUG_2023","AUG_2024",
                                                                         "OCT_2021", "OCT_2022","OCT_2023","OCT_2024"))
 
-
-ggplot(scores_nmds, aes(x = NMDS1, y = NMDS2, color = Species)) +
-  facet_wrap(~Occasion, scales = "free_y") +
-  geom_point(size = 3, alpha = 0.8) +
-  stat_ellipse(aes(fill = Species),
-               geom = "polygon",
-               alpha = 0.2,
-               color = NA) +
-  theme_classic() +
-  labs(
-    title = "NMDS of Stable Isotope Space",
-    subtitle = paste("Stress =", round(NMDS_SIA$stress, 3)),
-    x = "NMDS1",
-    y = "NMDS2"
-  )
 
 library(rcartocolor)
 display_carto_all()
@@ -134,7 +122,8 @@ ggplot(scores_nmds_clean, aes(x = NMDS1, y = NMDS2, color = Group)) +
   stat_ellipse(aes(fill = Group),
                geom = "polygon",
                alpha = 0.2,
-               color = NA) +
+               color = NA,
+               level = 0.95) +
   scale_color_manual(values = species_colors) +
   scale_fill_manual(values = species_colors) +
   theme_classic() +
@@ -144,4 +133,78 @@ ggplot(scores_nmds_clean, aes(x = NMDS1, y = NMDS2, color = Group)) +
     x = "NMDS1",
     y = "NMDS2"
   )
+
+
+# PERMANOVA
+
+dispersion <- betadisper(
+  dist(SIA_matrix),
+  SIA_avg$Group
+)
+
+anova(dispersion)
+
+boxplot(dispersion)
+
+set.seed(123)
+
+permanova <- adonis2(
+  SIA_matrix ~ Group * Occasion,
+  data = SIA_avg,
+  method = "euclidean",
+  permutations = 999
+)
+
+permanova # Groups differ in multivariate isotopic structure.
+
+permanova <- adonis2(
+  SIA_matrix ~ Group * Occasion,
+  data = SIA_avg,
+  method = "euclidean",
+  permutations = 999,
+  by = "terms"
+)
+
+permanova
+
+
+
+# attempting at permanova for all occasions
+
+library(vegan)
+library(dplyr)
+
+# List of all unique occasions
+occasions <- unique(SIA_avg$Occasion)
+
+# Create an empty list to store results
+permanova_results <- list()
+
+# Loop through each Occasion
+for (occ in occasions) {
+  # Subset the data for this occasion
+  data_occ <- SIA_avg %>% filter(Occasion == occ)
+  
+  # Create the isotope matrix (columns d13C and d15N)
+  SIA_matrix_occ <- data_occ %>% select(d13C, d15N)
+  
+  # Optional: scale if needed
+  # SIA_matrix_occ <- scale(SIA_matrix_occ)
+  
+  # Run PERMANOVA using Group as factor
+  perm <- adonis2(SIA_matrix_occ ~ Group, data = data_occ, method = "euclidean")
+  
+  # Save results in the list
+  permanova_results[[occ]] <- perm
+}
+
+# Check results for one occasion
+permanova_results[["MAY_2021"]]
+
+# Or print all results nicely
+for (occ in names(permanova_results)) {
+  cat("\nPERMANOVA results for", occ, ":\n")
+  print(permanova_results[[occ]])
+}
+
 
