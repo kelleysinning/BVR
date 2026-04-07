@@ -275,7 +275,7 @@ ggplot(data_SIA_SIBER_messy, aes(x = iso1, y = iso2, colour = group)) +
 
 
 
-# SUM STATS FOR EACH GROUP: TA, SEA & SEAc -----------
+# SUM STATS FOR EACH GROUP: TA, SEA & SEAc ----------------------------------
 # TA = Total Area = convex hull around all the data 
 # SEA = Standard Ellipse Area = 40% of the data 
 # SEAc = Standard Ellipse Area Corrected (small sample size corrected [< 20-30 individuals])
@@ -304,8 +304,8 @@ ggplot(NICHE_WIDTHS, aes(x = MONTH, y = SEA, group = SPECIES)) +
   facet_wrap(~YEAR) +
   theme_minimal() +
   ylab("SEA") +
-  scale_color_manual(values = c("#008080", "#DE8A5A")) +
-  scale_fill_manual(values = c("#008080", "#DE8A5A")) +
+  scale_color_manual(values = c("#008080", "#DE8A5A","#70A494", "#B4C8A8")) +
+  scale_fill_manual(values = c("#008080", "#DE8A5A","#70A494", "#B4C8A8")) +
   theme(legend.title = element_blank(),
         legend.position = "bottom",
         axis.title.x = element_blank()) 
