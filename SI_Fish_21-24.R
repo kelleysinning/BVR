@@ -130,7 +130,8 @@ SIA_FISH %>%
   
 # NICHE OVERLAP FOR EACH OCCASION-----------------------------------------------
 
-# FORMAT FOR SIBER
+# FORMAT FOR SIBERx
+
 data_SIA_SIBER <- SIA_FISH %>%
   select(d13C, d15N, Species, Occasion) %>%
   rename("iso1" = "d13C",
@@ -180,7 +181,7 @@ ggplot(data_SIA_SIBER, aes(x = iso1, y = iso2, colour = group)) +
   geom_point(size = 1.5, shape = 1) +
   stat_ellipse(position="identity", geom = "polygon", aes(fill = group), level=0.4, linewidth = 1, alpha = 0.25) +
   stat_ellipse(position="identity", level=0.95, linewidth=0.5, linetype = 2) +
-  facet_wrap2(. ~ community, ncol = 4, nrow = 3, scales = "free") +
+  facet_wrap(. ~ community, ncol = 4, nrow = 3, scales = "free") +
   #facet_wrap(. ~ community, ncol = 3, nrow = 4, scales = "free") + Use this for first order option
   xlab(expression(paste(delta^{13}, "C (\u2030)"))) +
   ylab(expression(paste(delta^{15}, "N (\u2030)"))) +
@@ -221,7 +222,7 @@ kable(NICHE_WIDTHS, caption = "ISOTOPIC NICHE AREAS", digits = 1, booktabs = T)
 
 
 # PLOT NICHE WIDTHS
-# This is SEA but if you change to SEA it's the same result
+# This is SEA but if you change to SEAc it's basically the same result
 ggplot(NICHE_WIDTHS, aes(x = MONTH, y = SEA, group = SPECIES)) +
   geom_point(aes(color = SPECIES)) +
   geom_line(aes(color = SPECIES)) +
