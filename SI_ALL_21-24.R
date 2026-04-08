@@ -44,10 +44,10 @@ SIA_ALL <- SIA_ALL %>%
 # Eliminating a bunch of family bug variation by not differentiating by family
 SIA_ALL <- SIA_ALL %>% 
   mutate(Species = if_else(Species == "FRY", "Fry", Species)) %>%
-  filter(Species != "Fish Eggs") %>%   # remove fish eggs them here
+  filter(!Species %in% c("Fry", "Fish Eggs")) %>%   # remove fish eggs them here
   mutate(
     Group = case_when(
-      Species %in% c("BNT", "MTS", "Fry") ~ Species,
+      Species %in% c("BNT", "MTS") ~ Species,
       TRUE ~ "Macro"
     )
   ) %>%
@@ -319,210 +319,77 @@ rm(NICHE_WIDTHS) # remove
 # Setting p.interval = 0.40 will result in an ellipse that contains approximately 40% of the data (SEA).
 # Setting p.interval = 0.95 will result in an ellipse that contains approximately 95% of the data.
 
-######### MAY 2021 ######### 
-MAY_2021_AREAS <- maxLikOverlap("MAY_2021.BNT", "MAY_2021.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-# Overlap relative to the total area used by that population -- so in this case, 
-# the overlap as a proportion of the non-overlapping area of the two ellipses, would be:
-MAY_2021_OVERLAP <- MAY_2021_AREAS[3] / (MAY_2021_AREAS[2] + 
-                                           MAY_2021_AREAS[1] -
-                                           MAY_2021_AREAS[3])
 
-######### AUG 2021 ######### 
-AUG_2021_AREAS <- maxLikOverlap("AUG_2021.BNT", "AUG_2021.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-AUG_2021_OVERLAP <- AUG_2021_AREAS[3] / (AUG_2021_AREAS[2] + 
-                                           AUG_2021_AREAS[1] -
-                                           AUG_2021_AREAS[3])
+# Example usage
+occasions <- c("MAY_2021", "AUG_2021", "OCT_2021",
+               "MAY_2022", "AUG_2022", "OCT_2022",
+               "MAY_2023", "AUG_2023", "OCT_2023",
+               "MAY_2024", "AUG_2024", "OCT_2024")
 
-######### OCT 2021 ######### 
 
-OCT_2021_AREAS <- maxLikOverlap("OCT_2021.BNT", "OCT_2021.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-OCT_2021_OVERLAP <- OCT_2021_AREAS[3] / (OCT_2021_AREAS[2] + 
-                                           OCT_2021_AREAS[1] -
-                                           OCT_2021_AREAS[3])
-######### MAY 2022 ######### 
-MAY_2022_AREAS <- maxLikOverlap("MAY_2022.BNT", "MAY_2022.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-MAY_2022_OVERLAP <- MAY_2022_AREAS[3] / (MAY_2022_AREAS[2] + 
-                                           MAY_2022_AREAS[1] -
-                                           MAY_2022_AREAS[3])
-######### AUGUST 2022 ######### 
-AUG_2022_AREAS <- maxLikOverlap("AUG_2022.BNT", "AUG_2022.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-AUG_2022_OVERLAP <- AUG_2022_AREAS[3] / (AUG_2022_AREAS[2] + 
-                                           AUG_2022_AREAS[1] -
-                                           AUG_2022_AREAS[3])
-######### OCTOBER 2022 ######### 
-OCT_2022_AREAS <- maxLikOverlap("OCT_2022.BNT", "OCT_2022.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-OCT_2022_OVERLAP <- OCT_2022_AREAS[3] / (OCT_2022_AREAS[2] + 
-                                           OCT_2022_AREAS[1] -
-                                           OCT_2022_AREAS[3])
+all_communities <- rownames(SIA_SIBER_OBJECT$sample.sizes)  # MAY_2021, AUG_2021, etc.
+all_groups <- colnames(SIA_SIBER_OBJECT$sample.sizes)        # BNT, Macro, MTS
 
-######### MAY 2023 ######### 
-MAY_2023_AREAS <- maxLikOverlap("MAY_2023.BNT", "MAY_2023.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-MAY_2023_OVERLAP <- MAY_2023_AREAS[3] / (MAY_2023_AREAS[2] + 
-                                           MAY_2023_AREAS[1] -
-                                           MAY_2023_AREAS[3])
 
-######### AUG 2023 ######### 
-AUG_2023_AREAS <- maxLikOverlap("AUG_2023.BNT", "AUG_2023.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-AUG_2023_OVERLAP <- AUG_2023_AREAS[3] / (AUG_2023_AREAS[2] + 
-                                           AUG_2023_AREAS[1] -
-                                           AUG_2023_AREAS[3])
+overlap_results <- list()
 
-######### OCT 2023 ######### 
+for(comm in all_communities) {
+  
+  # Only include groups that have data in this community (no NA in sample.sizes)
+  valid_groups <- all_groups[!is.na(SIA_SIBER_OBJECT$sample.sizes[comm, ])]
+  
+  if(length(valid_groups) < 2) next  # skip if fewer than 2 groups
+  
+  community_groups <- paste(comm, valid_groups, sep = ".")
+  pairs <- combn(community_groups, 2, simplify = FALSE)
+  
+  comm_results <- lapply(pairs, function(p) {
+    maxLikOverlap(p[1], p[2], SIA_SIBER_OBJECT, p.interval = 0.40, n = 100)
+  })
+  
+  names(comm_results) <- sapply(pairs, paste, collapse = " vs ")
+  overlap_results[[comm]] <- comm_results
+}
 
-OCT_2023_AREAS <- maxLikOverlap("OCT_2023.BNT", "OCT_2023.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-OCT_2023_OVERLAP <- OCT_2023_AREAS[3] / (OCT_2023_AREAS[2] + 
-                                           OCT_2023_AREAS[1] -
-                                           OCT_2023_AREAS[3])
-######### MAY 2024 ######### 
-MAY_2024_AREAS <- maxLikOverlap("MAY_2024.BNT", "MAY_2024.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-MAY_2024_OVERLAP <- MAY_2024_AREAS[3] / (MAY_2024_AREAS[2] + 
-                                           MAY_2024_AREAS[1] -
-                                           MAY_2024_AREAS[3])
-######### AUGUST 2024 ######### 
-AUG_2024_AREAS <- maxLikOverlap("AUG_2024.BNT", "AUG_2024.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-AUG_2024_OVERLAP <- AUG_2024_AREAS[3] / (AUG_2024_AREAS[2] + 
-                                           AUG_2024_AREAS[1] -
-                                           AUG_2024_AREAS[3])
-######### OCTOBER 2024 ######### 
-OCT_2024_AREAS <- maxLikOverlap("OCT_2024.BNT", "OCT_2024.MTS", SIA_SIBER_OBJECT, 
-                                p.interval = 0.40, n = 100)
-OCT_2024_OVERLAP <- OCT_2024_AREAS[3] / (OCT_2024_AREAS[2] + 
-                                           OCT_2024_AREAS[1] -
-                                           OCT_2024_AREAS[3])
+results_df <- do.call(rbind, lapply(names(overlap_results), function(comm) {
+  do.call(rbind, lapply(names(overlap_results[[comm]]), function(pair) {
+    res <- overlap_results[[comm]][[pair]]
+    data.frame(
+      community = comm,
+      pair      = pair,
+      overlap   = res["overlap"],
+      area1     = res["area.1"],
+      area2     = res["area.2"],
+      row.names = NULL
+    )
+  }))
+}))
 
 
 
-# PRINT RESULTS
-MAY_2021_OVERLAP <- MAY_2021_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2021,
-         SEASON = "MAY") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber)
+results_df <- do.call(rbind, lapply(names(overlap_results), function(comm) {
+  do.call(rbind, lapply(names(overlap_results[[comm]]), function(pair) {
+    res <- overlap_results[[comm]][[pair]]
+    
+    area1   <- res[1]
+    area2   <- res[2]
+    overlap <- res[3]
+    
+    prop_overlap <- overlap / (area1 + area2 - overlap)  # matches your prior formula
+    
+    data.frame(
+      community    = comm,
+      pair         = pair,
+      area1        = area1,
+      area2        = area2,
+      overlap_area = overlap,
+      prop_overlap = prop_overlap,
+      row.names    = NULL
+    )
+  }))
+}))
 
-AUG_2021_OVERLAP <- AUG_2021_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2021,
-         SEASON = "AUGUST") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber)
-
-OCT_2021_OVERLAP <- OCT_2021_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2021,
-         SEASON = "OCTOBER") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber)
-
-MAY_2022_OVERLAP <- MAY_2022_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2022,
-         SEASON = "MAY") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber)
-
-AUG_2022_OVERLAP <- AUG_2022_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2022,
-         SEASON = "AUGUST") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber) 
-
-OCT_2022_OVERLAP <- OCT_2022_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2022,
-         SEASON = "OCTOBER") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber)
-
-MAY_2023_OVERLAP <- MAY_2023_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2023,
-         SEASON = "MAY") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber)
-
-AUG_2023_OVERLAP <- AUG_2023_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2023,
-         SEASON = "AUGUST") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber)
-
-OCT_2023_OVERLAP <- OCT_2023_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2023,
-         SEASON = "OCTOBER") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber)
-
-MAY_2024_OVERLAP <- MAY_2024_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2024,
-         SEASON = "MAY") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber)
-
-AUG_2024_OVERLAP <- AUG_2024_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2024,
-         SEASON = "AUGUST") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber) 
-
-OCT_2024_OVERLAP <- OCT_2024_OVERLAP %>%
-  as.data.frame() %>%
-  mutate(YEAR = 2024,
-         SEASON = "OCTOBER") %>%
-  rename("OVERLAP" = ".") %>%
-  rownames_to_column(var = "RowNumber") %>%
-  select(-RowNumber)
-
-OVERLAP_DF <- rbind(MAY_2021_OVERLAP, AUG_2021_OVERLAP, OCT_2021_OVERLAP, 
-                    MAY_2022_OVERLAP, AUG_2022_OVERLAP, OCT_2022_OVERLAP,
-                    MAY_2023_OVERLAP, AUG_2023_OVERLAP, OCT_2023_OVERLAP, 
-                    MAY_2024_OVERLAP, AUG_2024_OVERLAP, OCT_2024_OVERLAP) %>%
-  select(YEAR, SEASON, OVERLAP) %>%
-  mutate(
-    YEAR = factor(YEAR, levels = c("2021", "2022", "2023", "2024")),
-    SEASON = factor(SEASON, levels = c("MAY", "AUGUST", "OCTOBER")))
-
-# TABLE
-kable(OVERLAP_DF, caption = "ISOTOPIC NICHE OVERLAP (SEA)", digits = 2, booktabs = T) 
-
-# PLOT
-ggplot(OVERLAP_DF, aes(x = SEASON, y = OVERLAP, group = YEAR)) +
-  geom_point(aes(color = YEAR)) +
-  geom_line(aes(color = YEAR)) +
-  theme_minimal() +
-  ylab("Isotpoic Niche Overlap (SEA)") +
-  theme(legend.title = element_blank(),
-        legend.position = "bottom",
-        axis.title.x = element_blank()) 
-
-
+print(results_df)
 
 
 

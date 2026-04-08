@@ -15,7 +15,7 @@ library(lubridate)
 setwd("~/Library/CloudStorage/OneDrive-Colostate/Data/BVR")
 
 # IMPORT SIA DATA
-SIA_FISH <- read_csv("Meta_SIA_Data.csv")
+SIA_ALL <- read_csv("Meta_SIA_Data.csv")
 
 Sampling_dates <- read_csv("Sampling_dates.csv")
 
@@ -26,10 +26,10 @@ Sampling_dates <- Sampling_dates %>%
 problems()
 
 
-str(SIA_FISH)
+str(SIA_ALL)
 
 # Putting sampling occassions in order
-SIA_FISH$Occasion <- factor(SIA_FISH$Occasion, levels = c("MAY_2021", "AUG_2021", "OCT_2021",
+SIA_ALL$Occasion <- factor(SIA_ALL$Occasion, levels = c("MAY_2021", "AUG_2021", "OCT_2021",
                                                  "MAY_2022", "AUG_2022", "OCT_2022",
                                                  "MAY_2023", "AUG_2023", "OCT_2023",
                                                  "MAY_2024", "AUG_2024", "OCT_2024"))
@@ -37,7 +37,7 @@ SIA_FISH$Occasion <- factor(SIA_FISH$Occasion, levels = c("MAY_2021", "AUG_2021"
 
 # Adding a sampling date column so it isn't just month/year 
 # better for linking with specific hydrograph patterns
-SIA_FISH <- SIA_FISH %>%
+SIA_ALL <- SIA_ALL %>%
   left_join(Sampling_dates, by = c("Occasion", "Location"))
 
 
@@ -54,7 +54,7 @@ SIA_FISH <- SIA_FISH %>%
 
 # If you just use SIA_FISH the below graphs are hideous bc the bugs make it really
 # hard to differentiate facets, so here I filtered for just BNT and MTS
-SIA_JUST_FISH <- SIA_FISH %>%
+SIA_JUST_FISH <- SIA_ALL %>%
   filter(Species %in% c("BNT", "MTS"))
 
 SIA_JUST_FISH$Occasion <- factor(SIA_JUST_FISH$Occasion, levels = c("MAY_2021", "AUG_2021", "OCT_2021",
@@ -199,6 +199,7 @@ ggplot(data_SIA_SIBER, aes(x = iso1, y = iso2, colour = group)) +
     legend.background = element_rect(fill = "transparent", color = NA),
     legend.key = element_rect(fill = "transparent", color = NA)
   )
+
 
 # SUM STATS FOR EACH GROUP: TA, SEA & SEAc -----------
 # TA = Total Area = convex hull around all the data 
