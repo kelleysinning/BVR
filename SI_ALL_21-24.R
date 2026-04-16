@@ -185,8 +185,8 @@ ggplot(data_SIA_SIBER, aes(x = iso1, y = iso2, colour = group)) +
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
     legend.title = element_blank(),
-    legend.position = c(0.99, 0.01),
-    legend.justification = c("right", "bottom"),
+    legend.position = "top",
+    legend.justification = "center",
     legend.text = element_text(size = 8), # smaller legend text
     legend.key.size = unit(0.4, "cm"),    # smaller legend boxes
     legend.background = element_rect(fill = "transparent", color = NA),

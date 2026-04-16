@@ -19,8 +19,8 @@ packageVersion("dataRetrieval")  # should be >= 2.7.19
 site <- "USGS-09057500"  # USGS site number (Blue River below Green Mountain)
 parameter_code <- "00060"    # Parameter code for discharge (ft³/s)
 statistic_id <- "00003"      # Statistic code for daily mean
-start_date <- "2021-01-01"
-end_date <- "2026-01-01"
+start_date <- "2021-04-01"
+end_date <- "2026-04-01"
 
 # Retrieve daily discharge data
 discharge_data_ <- read_waterdata_daily(
@@ -40,8 +40,8 @@ discharge_data_ <- discharge_data_ %>%
 site <- "09057500"          # USGS site number
 parameterCd <- "00060"      # Discharge (cfs)
 statCd <- "00003"           # Daily mean
-startDate <- "2021-01-01"
-endDate <- "2026-01-01"
+startDate <- "2021-04-01"
+endDate <- "2026-04-01"
 
 # Retrieve daily values
 discharge_data <- readNWISdv(
@@ -62,9 +62,10 @@ discharge_data <- discharge_data %>%
  # A, P = data qualifiers (approved, provisional) for Qualifier
 
 # BRINGING IN ALGAE DATA-------------------------------------------------------
-# to merge with discharge
+# to merge with dischargex
+
 setwd("/Users/kelleysinning/Library/CloudStorage/OneDrive-Colostate/Data/BVR")
-didymo_benthotorch <- read.csv("ALL_bentho_core_.csv")
+didymo_benthotorch <- read.csv("ALL_Bentho_Core_2026.csv")
 didymo_benthotorch <- didymo_benthotorch %>%
   filter(!is.na(Sampling_date)) # removing NA columns that arose from comments in the csv
 
@@ -91,13 +92,13 @@ sample_dates <- c(
   "2024-08-13", "2024-09-26", "2024-10-26", "2024-11-14", "2025-01-16", "2025-03-11",
   "2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23", "2025-06-10",
   "2025-06-18", "2025-07-30", "2025-08-27", "2025-09-23", "2025-10-20","2025-10-22", 
-  "2025-10-21", "2025-10-19", "2025-11-14", "2025-12-15"
+  "2025-10-21", "2025-10-19", "2025-11-14", "2025-12-15", "2026-02-14", "2026-03-07"
 )
 
 velocity_dates <- c("2024-07-24", "2024-08-13", "2024-09-26", "2024-10-26", "2024-11-14", "2025-01-16",
                     "2025-03-11", "2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23",
                     "2025-06-10", "2025-07-30", "2025-08-27", "2025-09-23", "2025-10-20","2025-10-22", 
-                    "2025-10-21", "2025-10-19", "2025-11-14", "2025-12-15") # These additional dates have paired velocity
+                    "2025-10-21", "2025-10-19", "2025-11-14", "2025-12-15", "2026-02-14", "2026-03-07") # These additional dates have paired velocity
 
 
 # Convert to Date
@@ -654,6 +655,7 @@ didymo_over_time <- didymo_over_time %>%
   filter(!is.na(Concentration)) # removing NA and making conc. numeric
 
 str(didymo_over_time)
+
 ggplot(didymo_over_time, aes(x = Sampling_date, y = Concentration, fill = Algae_Type)) +
   geom_boxplot(position = position_dodge(width = 0.8)) +  
   labs(
@@ -701,6 +703,17 @@ ggplot() +
     color = "#008080",
     alpha = 0.7
   ) +
+  
+  ## Algae points (THIS is what you're missing)
+  #geom_point(
+   # data = didymo_over_time,
+    #aes(x = Sampling_date,
+     #   y = Concentration,
+      #  color = Algae_Type),   # <-- map color here
+  #  size = 2,
+   # alpha = 0.9,
+    #position = position_jitter(width = 1)
+  #) +
   
   ## Primary axis: concentration
   scale_y_continuous(
@@ -786,6 +799,7 @@ ggplot() +
     panel.grid.minor = element_blank()
     #axis.line = element_line(color = "black")
   )
+
 library(rcartocolor)
 install.packages(rcartocolor)
 mycolors <- carto_pal(7, "Earth")
