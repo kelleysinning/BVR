@@ -19,11 +19,11 @@ packageVersion("dataRetrieval")  # should be >= 2.7.19
 site <- "USGS-09057500"  # USGS site number (Blue River below Green Mountain)
 parameter_code <- "00060"    # Parameter code for discharge (ft³/s)
 statistic_id <- "00003"      # Statistic code for daily mean
-start_date <- "2021-04-01"
-end_date <- "2026-05-01"
+start_date <- "2021-04-01" # Date before first sampling event ever
+end_date <- "2026-08-24" # Date following most recent benthotorching/sampling event
 
 # Retrieve daily discharge data
-discharge_data_ <- read_waterdata_daily(
+discharge_data <- read_waterdata_daily(
   monitoring_location_id = site,
   parameter_code = parameter_code,
   statistic_id = statistic_id,
@@ -31,8 +31,13 @@ discharge_data_ <- read_waterdata_daily(
   skipGeometry = TRUE,
 )
 
-discharge_data_ <- discharge_data_ %>%
+discharge_data <- discharge_data %>%
   select(time, value, approval_status)
+
+discharge_data <- discharge_data %>%
+  rename(Discharge_cfs = value,
+         Date = time
+  )
 
 
 # So using readNWISdv...it's older but works
@@ -41,7 +46,7 @@ site <- "09057500"          # USGS site number
 parameterCd <- "00060"      # Discharge (cfs)
 statCd <- "00003"           # Daily mean
 startDate <- "2021-04-01"
-endDate <- "2026-04-01"
+endDate <- "2026-08-024"
 
 # Retrieve daily values
 discharge_data <- readNWISdv(
@@ -62,17 +67,17 @@ discharge_data <- discharge_data %>%
  # A, P = data qualifiers (approved, provisional) for Qualifier
 
 # BRINGING IN ALGAE DATA-------------------------------------------------------
-# to merge with dischargex
+# to merge with discharge
 
 setwd("~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR")
-didymo_benthotorch <- read.csv("ALL_Bentho_Core_2026.csv")
+didymo_benthotorch <- read.csv("ALL_Bentho_Core.csv")
 didymo_benthotorch <- didymo_benthotorch %>%
   filter(!is.na(Sampling_date)) # removing NA columns that arose from comments in the csv
 
 str(didymo_benthotorch)
 # Making sure date formats are the same
 didymo_benthotorch$Sampling_date <- as.Date(didymo_benthotorch$Sampling_date)  
-discharge_data$Date <- as.Date(discharge_data$Date)
+discharge_data$time <- as.Date(discharge_data$time)
 
 # Making sure columns are numeric
 str(didymo_benthotorch)
@@ -80,41 +85,47 @@ didymo_benthotorch <- didymo_benthotorch %>%
   mutate(across(c(Cyano, Green, Diatoms, Chlorophyll.A, Velocity),
                 as.numeric))
 
-# Before getting 30 day stats, I just want to have a df that has the discharge with the sample
-# data that I can have a hydrograph for-----------------------------------------
+# HYDROGRAPH WITH DATES OF BENTHOTORCH AND VELOCITIES---------------------------------------
 library(dplyr)
 
 sort(unique(didymo_benthotorch$Sampling_date))
-sample_dates <- c(
+sample_dates <- c( # Dates that Benthotorch have been taken
   "2023-01-15", "2023-03-21", "2023-05-12", "2023-05-24", "2023-06-27", "2023-07-31",
   "2023-10-04", "2024-05-13", "2024-05-14", "2024-05-15", "2024-05-16", "2024-05-17",
   "2024-07-24", "2024-07-29", "2024-07-30", "2024-07-31", "2024-08-01", "2024-08-02",
   "2024-08-13", "2024-09-26", "2024-10-26", "2024-11-14", "2025-01-16", "2025-03-11",
   "2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23", "2025-06-10",
-  "2025-06-18", "2025-07-30", "2025-08-27", "2025-09-23", "2025-10-20","2025-10-22", 
+  "2025-06-18", "2025-07-30", "2025-08-27", "2025-09-23", "2025-10-20", "2025-10-22", 
   "2025-10-21", "2025-10-19", "2025-11-14", "2025-12-15", "2026-02-14", "2026-03-07", 
-  "2026-04-11"
+  "2026-04-11", "2026-05-25", "2026-05-26", "2026-05-27", "2026-05-28", "2026-05-29",
+  "2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06", "2026-08-07"
 )
 
 velocity_dates <- c("2024-07-24", "2024-08-13", "2024-09-26", "2024-10-26", "2024-11-14", "2025-01-16",
                     "2025-03-11", "2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23",
                     "2025-06-10", "2025-07-30", "2025-08-27", "2025-09-23", "2025-10-20","2025-10-22", 
                     "2025-10-21", "2025-10-19", "2025-11-14", "2025-12-15", "2026-02-14", "2026-03-07", 
-                    "2026-04-11") # These additional dates have paired velocity
+                    "2026-04-11", "2026-05-25", "2026-05-26", "2026-05-27", "2026-05-28", "2026-05-29",
+                    "2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06", "2026-08-07"
+                    ) # These additional dates have paired velocity
+
 
 
 # Convert to Date
 sample_dates <- as.Date(sample_dates)
 velocity_dates <- as.Date(velocity_dates)
 
+
 # Adding a new column for it it was sampled or not
 discharge_data <- discharge_data %>%
   mutate(sampled = if_else(Date %in% sample_dates, "yes", "no"),
          velocity = if_else(Date %in% velocity_dates, "yes", "no"))
 
+
+# This filters for all benthotorch data
 discharge_data <- discharge_data %>%
-  filter(Date >= as.Date("2023-01-01") &
-           Date <= as.Date("2026-05-01"))
+  filter(Date > as.Date("2023-01-01") &
+           Date < as.Date("2026-08-24"))
 
 
 # Filter just the sampling dates for vertical lines
@@ -141,7 +152,7 @@ ggplot(discharge_data, aes(x = Date, y = Discharge_cfs)) +
     panel.grid.minor = element_blank()   # remove minor grid lines
   )
 
-
+# Here, you can see months better
 ggplot(discharge_data, aes(x = Date, y = Discharge_cfs)) +
   geom_line() +
   geom_vline(xintercept = sample_dates, color = "#70A494") +
@@ -150,6 +161,159 @@ ggplot(discharge_data, aes(x = Date, y = Discharge_cfs)) +
   labs(x = "Date", y = "Discharge (cfs)") +
   theme_minimal()
 
+### DIDYMO OVER TIME W/ HYDROGRAPH -----------------------------------------------
+
+# Pivot your algae columns to long format
+
+didymo_over_time <- didymo_benthotorch %>%
+  pivot_longer(
+    cols = c(Cyano, Green, Diatoms),   # the algae columns
+    names_to = "Algae_Type",
+    values_to = "Concentration"
+  ) %>%
+  filter(Algae_Type == "Diatoms")
+
+didymo_over_time <- didymo_over_time %>%
+  mutate(
+    Concentration = as.numeric(Concentration)
+  )%>%
+  filter(!is.na(Concentration)) # removing NA and making conc. numeric
+
+didymo_over_time$Sampling_date <- as.character(didymo_over_time$Sampling_date)
+
+str(didymo_over_time)
+
+ggplot(didymo_over_time, aes(x = Sampling_date, y = Concentration, fill = Algae_Type)) +
+  geom_boxplot(position = position_dodge(width = 0.8)) +  
+  labs(
+    x = "Date",
+    y = "Algae Concentration",
+    fill = "Algae Type"
+  ) +
+  scale_fill_manual(
+    values = c("Green" = "#70A494", "Cyano" = "#DE8A5A", "Diatoms" = "#2887A1"), 
+    name = "Algae Type") + 
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  
+    legend.position = "top"
+  ) # make sure date is a character to run this right
+
+
+
+# Overlaying with hydrology
+didymo_over_time <- didymo_over_time %>%
+  mutate(Sampling_date = as.Date(Sampling_date))
+
+scale_factor <- 0.01
+
+ggplot() +
+  ## Hydrograph (scaled)
+  geom_line(
+    data = discharge_data,
+    aes(x = Date, y = Discharge_cfs * scale_factor),
+    color = "grey40",
+    linewidth = 0.8
+  ) +
+  
+  ## Boxplots (grouped by sampling date)
+  geom_boxplot(
+    data = didymo_over_time,
+    aes(x = Sampling_date,
+        y = Concentration,
+        group = Sampling_date),
+    width = 3,
+    fill = "#2887A1",
+    color = "#008080",
+    alpha = 0.7
+  ) +
+  
+  ## Primary axis: concentration
+  scale_y_continuous(
+    name = expression("Diatom concentration (" * mu * "g " * "chl-a" / cm^2 * ")"),
+    sec.axis = sec_axis(
+      transform = ~ . / scale_factor,  # <-- must provide function
+      name = "Discharge (CFS)"
+    )
+  ) +
+  
+  scale_x_date(name = "Date") +
+  theme_bw()
+
+
+
+# Overlaying with SI
+Sampling_dates <- read_csv("Sampling_dates.csv")
+
+Sampling_dates <- Sampling_dates %>%
+  mutate(Sampling_date = mdy(Sampling_date))
+
+ggplot() +
+  # SI
+  geom_vline(
+    data = Sampling_dates,
+    aes(xintercept = Sampling_date, color = Occasion), 
+    linetype = "dashed",
+    linewidth = 0.3
+  ) +
+  scale_color_manual(values = c( # For better visuals on poster
+    MAY_2021 = "#B4C8A8",
+    MAY_2022 = "#B4C8A8",
+    MAY_2023 = "#B4C8A8",
+    MAY_2024 = "#B4C8A8",
+    MAY_2025 = "#B4C8A8",
+    AUG_2021 = "#EDBB8A",
+    AUG_2022 = "#EDBB8A",
+    AUG_2023 = "#EDBB8A",
+    AUG_2024 = "#EDBB8A",
+    AUG_2025 = "#EDBB8A",
+    OCT_2021 = "#DE8A5A",
+    OCT_2022 = "#DE8A5A",
+    OCT_2023 = "#DE8A5A",
+    OCT_2024 = "#DE8A5A",
+    OCT_2025 = "#DE8A5A")) +
+  
+  ## Hydrograph (scaled)
+  geom_line(
+    data = discharge_data,
+    aes(x = Date, y = Discharge_cfs * scale_factor),
+    color = "grey40",
+    linewidth = 0.8
+  ) +
+  
+  ## Boxplots (grouped by sampling date)
+  geom_boxplot(
+    data = didymo_over_time,
+    aes(x = Sampling_date,
+        y = Concentration,
+        group = Sampling_date),
+    width = 3,
+    fill = "#2887A1",
+    color = "#008080",
+    alpha = 0.7
+  ) +
+  
+  ## Axes
+  scale_y_continuous(
+    name = expression("Diatom concentration (" * mu * "g " * "chl-a" / cm^2 * ")"),
+    sec.axis = sec_axis(
+      transform = ~ . / scale_factor,  # <-- must provide function
+      name = "Discharge (CFS)"
+    )
+  ) +
+  
+  scale_x_date(name = "Date") +
+  theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    panel.grid.minor = element_blank()
+    #axis.line = element_line(color = "black")
+  )
+
+library(rcartocolor)
+install.packages(rcartocolor)
+mycolors <- carto_pal(7, "Earth")
+mycolors
 
 
 # DISCHARGE (30 DAY MEAN AVERAGE PRIOR TO SAMPLING) RELATIONSHIPS --------------------
@@ -177,8 +341,7 @@ didymo_benthotorch <- cbind(didymo_benthotorch, stats_matrix)
 head(didymo_benthotorch)
 
 
-# Averaging across replicates
-
+# DISCHARGE RELATIONSHIPS ACROSS BENTHOTORCH REPS------------------------------
 avg_didymo_benthotorch <- didymo_benthotorch %>%
   select(Sampling_date, Site, Sample.Type, 
          Cyano, Green, Diatoms, Chlorophyll.A,
@@ -191,10 +354,7 @@ avg_didymo_benthotorch <- didymo_benthotorch %>%
     .groups = "drop"
   )
 
-
-
 # Pivot your algae columns to long format
-
 algae_long <- avg_didymo_benthotorch %>%
   pivot_longer(
     cols = c(Cyano, Green, Diatoms),   # the algae columns
@@ -202,16 +362,26 @@ algae_long <- avg_didymo_benthotorch %>%
     values_to = "Concentration"
   )
 
-# Plotting
+algae_long$Algae_Type <- factor(algae_long$Algae_Type, levels = c("Green", "Cyano", "Diatoms"))
+
+# To look at boxplots before algae was averaged across replicates run this*****
+# and switch out algae_long for nonavg_algae_long
+nonavg_algae_long <- didymo_benthotorch %>%
+  pivot_longer(
+  cols = c(Cyano, Green, Diatoms),   # the algae columns
+  names_to = "Algae_Type",
+  values_to = "Concentration"
+ )
+
+nonavg_algae_long$Algae_Type <- factor(nonavg_algae_long$Algae_Type, levels = c("Green", "Cyano", "Diatoms"))
+
+# Plotting algae over time and over discharge
 library(rcartocolor)
 display_carto_all()
 carto_pal(7, "Geyser")
 
-# First, ordering things how I like
-algae_long$Algae_Type <- factor(algae_long$Algae_Type, levels = c("Green", "Cyano", "Diatoms"))
-
 # Algae over time at each site
-ggplot(algae_long, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
+ggplot(nonavg_algae_long, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
   geom_point(size = 3, alpha = 0.8) +
   geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +  # one line per algae type
   facet_wrap(~Site) +
@@ -231,7 +401,7 @@ ggplot(algae_long, aes(x = Sampling_date, y = Concentration, color = Algae_Type)
   )
 
 # SAA with discharge fun
-ggplot(algae_long, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
+ggplot(nonavg_algae_long, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
   geom_point(aes(size = mean_30d, alpha = 0.7)) +  # size represents mean discharge
   geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +  
   facet_wrap(~Site) +
@@ -251,7 +421,7 @@ ggplot(algae_long, aes(x = Sampling_date, y = Concentration, color = Algae_Type)
   )
 
 # Algae response to discharge at each site
-ggplot(algae_long, aes(x = mean_30d, y = Concentration, color = Algae_Type)) +
+ggplot(nonavg_algae_long, aes(x = mean_30d, y = Concentration, color = Algae_Type)) +
   geom_point(size = 3, alpha = 0.8) +
   geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +  
   facet_wrap(~Site) +
@@ -273,7 +443,7 @@ ggplot(algae_long, aes(x = mean_30d, y = Concentration, color = Algae_Type)) +
 
 
 # Algae at each site with boxplots
-ggplot(algae_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
+ggplot(nonavg_algae_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
   geom_boxplot(position = position_dodge(width = 0.8)) +  # side-by-side boxes per site
   labs(
     x = "Site",
@@ -292,18 +462,7 @@ ggplot(algae_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
 
 
 # Boxplots across discharge...first have to make discharge categorical
-
-# To look at boxplots before algae was averaged across replicates run this # code below
-# and switch out algae_long for nonavg_algae_long
-
-  # nonavg_algae_long <- didymo_benthotorch %>%
-  # pivot_longer(
-  #  cols = c(Cyano, Green, Diatoms),   # the algae columns
-  #  names_to = "Algae_Type",
-  # values_to = "Concentration"
-  # )
-
-bins <- algae_long %>%
+bins <- nonavg_algae_long %>%
   mutate(discharge_bin = cut(mean_30d,
                              breaks = c(0, 50, 100, 200, 500, 1000, Inf),
                              labels = c("0–50", "50–100", "100–200", "200–500", "500–1000", "1000+")))
@@ -324,7 +483,7 @@ ggplot(bins, aes(x = discharge_bin, y = Concentration, fill = Algae_Type)) +
     legend.position = "top"
   )
 
-# VELOCITY RELATIONSHIPS WITH AVERAGED REPS--------------------------------------
+# VELOCITY RELATIONSHIPS ACROSS BENTHOTORCH REPS--------------------------------------
 
 #Filtering just for data with velocity
 didymo_benthotorch_velocity <- didymo_benthotorch %>%
@@ -332,7 +491,7 @@ didymo_benthotorch_velocity <- didymo_benthotorch %>%
 
 sort(unique(didymo_benthotorch_velocity$Sampling_date))
 
-# This is for when replicates were averaged
+# This is for when replicates are averaged
 avg_didymo_benthotorch_velocity <- didymo_benthotorch_velocity %>%
   select(Sampling_date, Site, Sample.Type,  
          Cyano, Green, Diatoms, Chlorophyll.A, Velocity,
@@ -343,8 +502,9 @@ avg_didymo_benthotorch_velocity <- didymo_benthotorch_velocity %>%
            \(x) mean(x, na.rm = TRUE)),  
     Replicate_number = n(),   # how many replicates went into the average
     .groups = "drop"
-  )
+  ) 
 
+# When you want averaged replicates
 velocity_long_avg <- avg_didymo_benthotorch_velocity %>%
   pivot_longer(
     cols = c(Cyano, Green, Diatoms),   # the algae columns
@@ -352,14 +512,24 @@ velocity_long_avg <- avg_didymo_benthotorch_velocity %>%
     values_to = "Concentration"
   )
 
-# Ordering things how I like
 velocity_long_avg$Algae_Type <- factor(velocity_long_avg$Algae_Type, levels = c("Green", "Cyano", "Diatoms"))
 
+# To look at raw data before algae was averaged across replicates run this*****
+# and switch out velocity_long for velocity_long_avg
+velocity_long <- didymo_benthotorch_velocity %>%
+  pivot_longer(
+    cols = c(Cyano, Green, Diatoms),   # the algae columns
+    names_to = "Algae_Type",
+    values_to = "Concentration"
+  ) 
 
-# Plotting
+velocity_long$Algae_Type <- factor(velocity_long$Algae_Type, levels = c("Green", "Cyano", "Diatoms"))
+velocity_long <- velocity_long %>%
+  mutate(Month_Year = format(Sampling_date, "%Y-%m"))
+
 
 # Algae over time for each site
-ggplot(velocity_long_avg, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
+ggplot(velocity_long, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
   geom_point(size = 3, alpha = 0.8) +
   geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +  # one line per algae type
   facet_wrap(~Site) +
@@ -379,7 +549,7 @@ ggplot(velocity_long_avg, aes(x = Sampling_date, y = Concentration, color = Alga
   )
 
 # SAA with velocity fun
-ggplot(velocity_long_avg, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
+ggplot(velocity_long, aes(x = Sampling_date, y = Concentration, color = Algae_Type)) +
   geom_point(aes(size = Velocity, alpha = 0.7)) +  # size represents mean Velocity
   geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +  
   facet_wrap(~Site) +
@@ -399,7 +569,7 @@ ggplot(velocity_long_avg, aes(x = Sampling_date, y = Concentration, color = Alga
   )
 
 # Algae response to velocity at each site
-ggplot(velocity_long_avg, aes(x = Velocity, y = Concentration, color = Algae_Type)) +
+ggplot(velocity_long, aes(x = Velocity, y = Concentration, color = Algae_Type)) +
   geom_point(size = 3, alpha = 0.8) +
   geom_smooth(aes(group = Algae_Type), method = "lm", se = FALSE, size = 1) +
   facet_wrap(~Site, scales = "free") +
@@ -421,7 +591,7 @@ ggplot(velocity_long_avg, aes(x = Velocity, y = Concentration, color = Algae_Typ
 
 
 # Algae at each site with boxplots
-ggplot(velocity_long_avg, aes(x = Site, y = Concentration, fill = Algae_Type)) +
+ggplot(velocity_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
   geom_boxplot(position = position_dodge(width = 0.8)) +  # side-by-side boxes per site
   labs(
     x = "Site",
@@ -438,24 +608,17 @@ ggplot(velocity_long_avg, aes(x = Site, y = Concentration, fill = Algae_Type)) +
   )
 
 
-# Boxplots across velocity...first have to make velocity categorical-------
-
-# This is still for averaged replicates, use velocity_long below to see non avg
-# playing around with different blocks
-
-vbins <- velocity_long_avg %>%
-  mutate(velocity_bin = cut(Velocity,
-                            breaks = c(0, 0.2, 0.3, 0.4, 0.6, 1, Inf),
-                            labels = c("0–0.2", "0.2–0.3", 
-                                       "0.3–0.4", "0.4–0.6", "0.6–1", "Above 1")))
-
-vbins <- velocity_long %>%
+# Categorizing by bins
+vbins <- velocity_long %>% 
   mutate(velocity_bin = cut(Velocity,
                             breaks = c(0, 0.2,  0.4, 0.6, 1, Inf),
                             labels = c("0–0.2", "0.2–0.4", "0.4–0.6", 
                                        "0.6–0.1", "Above 1")))
 
-# this is for unaveraged, raw data for diatoms only, see diatoms creation near the mixed models
+# To look at diatom-velocity relationships
+diatoms <- velocity_long %>%
+  filter(Algae_Type == "Diatoms")
+
 vbins <- diatoms %>%
   filter(Velocity >= 0) %>%   # removes negative velocities
   mutate(velocity_bin = cut(Velocity,
@@ -463,7 +626,8 @@ vbins <- diatoms %>%
                             labels = c("0–0.2", "0.2–0.3", 
                                        "0.3–0.4", "0.4–0.6", "0.6–1", "Above 1")))
 
-ggplot(vbins, aes(x = velocity_bin, y = Concentration, fill = Algae_Type)) +
+# Algae across velocity "bins"
+ggplot(vbins, aes(x = velocity_bin, y = Concentration, fill = Algae_Type)) + # Can run vbins with "diatoms" to only see diatoms
   geom_boxplot(position = position_dodge(width = 0.8)) +  # side-by-side boxes per site
   labs(
     x = "Velocity",
@@ -479,7 +643,7 @@ ggplot(vbins, aes(x = velocity_bin, y = Concentration, fill = Algae_Type)) +
     legend.position = "top"
   )
 
-# now, linear
+# Linear diatom-velocity relationship
 ggplot(diatoms, aes(x = Velocity, y = Concentration, color = Algae_Type)) +
   geom_point(alpha = 0.7) +
   geom_smooth(method = "lm", se = FALSE, lwd = 1.2) +  # linear trend line
@@ -498,42 +662,7 @@ ggplot(diatoms, aes(x = Velocity, y = Concentration, color = Algae_Type)) +
   )
 
 
-install.packages("rstatix")
-library(rstatix)
-
-# Not normal
-shapiro.test(velocity_long$Concentration)
-
-
-# Non-parametric  pairwise comparisons (within bins)
-wilcox_test <- vbins %>%
-  group_by(velocity_bin) %>%
-  wilcox_test(Concentration ~ Algae_Type)
-
-
-
-
-
-# NOT AVERAGING REPLICATES------------------------------------------------------
-# trying to do one box per site and per sampling
-
-velocity_long <- didymo_benthotorch_velocity %>%
-  pivot_longer(
-    cols = c(Cyano, Green, Diatoms),   # the algae columns
-    names_to = "Algae_Type",
-    values_to = "Concentration"
-  ) # This is what we want to use
-
-
-velocity_long <- velocity_long %>%
-  mutate(Month_Year = format(Sampling_date, "%Y-%m"))
-
-
-# Ordering things how I like
-velocity_long$Algae_Type <- factor(velocity_long$Algae_Type, levels = c("Green", "Cyano", "Diatoms"))
-
-
-# Algae response to velocity at each site
+# Algae response to velocity at each site at each sampling period
 velocity_long %>%
   group_split(Site) %>%
   walk(~ {
@@ -566,8 +695,7 @@ velocity_long %>%
 
 
 # Algae at each site with boxplots
-# This goes with algae x sites below
-ggplot(velocity_long, aes(x = Site, y = Concentration, fill = Algae_Type)) +
+ggplot(velocity_long_avg, aes(x = Site, y = Concentration, fill = Algae_Type)) +
   geom_boxplot(position = position_dodge(width = 0.8)) +  
   labs(
     x = "Site",
@@ -640,172 +768,7 @@ summary(model)
 anova(model)
 
 
-### DIDYMO OVER TIME---------------------------------------------------
-
-# Pivot your algae columns to long format
-
-didymo_over_time <- didymo_benthotorch %>%
-  pivot_longer(
-    cols = c(Cyano, Green, Diatoms),   # the algae columns
-    names_to = "Algae_Type",
-    values_to = "Concentration"
-  ) %>%
-  filter(Algae_Type == "Diatoms")
-
-didymo_over_time <- didymo_over_time %>%
-  mutate(
-    Concentration = as.numeric(Concentration)
-  )%>%
-  filter(!is.na(Concentration)) # removing NA and making conc. numeric
-
-didymo_over_time$Sampling_date <- as.character(didymo_over_time$Sampling_date)
-
-str(didymo_over_time)
-
-ggplot(didymo_over_time, aes(x = Sampling_date, y = Concentration, fill = Algae_Type)) +
-  geom_boxplot(position = position_dodge(width = 0.8)) +  
-  labs(
-    x = "Date",
-    y = "Algae Concentration",
-    fill = "Algae Type"
-  ) +
-  scale_fill_manual(
-    values = c("Green" = "#70A494", "Cyano" = "#DE8A5A", "Diatoms" = "#2887A1"), 
-    name = "Algae Type") + 
-  theme_bw() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),  
-    legend.position = "top"
-  ) # make sure date is a character to run this right
-
-
-
-# Overlaying with hydrology
-
-str(discharge_data)
-
-didymo_over_time <- didymo_over_time %>%
-  mutate(Sampling_date = as.Date(Sampling_date))
-
-scale_factor <- 0.01
-
-ggplot() +
-  ## Hydrograph (scaled)
-  geom_line(
-    data = discharge_data,
-    aes(x = Date, y = Discharge_cfs * scale_factor),
-    color = "grey40",
-    linewidth = 0.8
-  ) +
-  
-  ## Boxplots (grouped by sampling date)
-  geom_boxplot(
-    data = didymo_over_time,
-    aes(x = Sampling_date,
-        y = Concentration,
-        group = Sampling_date),
-    width = 3,
-    fill = "#2887A1",
-    color = "#008080",
-    alpha = 0.7
-  ) +
-  
-  ## Algae points (THIS is what you're missing)
-  #geom_point(
-   # data = didymo_over_time,
-    #aes(x = Sampling_date,
-     #   y = Concentration,
-      #  color = Algae_Type),   # <-- map color here
-  #  size = 2,
-   # alpha = 0.9,
-    #position = position_jitter(width = 1)
-  #) +
-  
-  ## Primary axis: concentration
-  scale_y_continuous(
-    name = expression("Diatom concentration (" * mu * "g " * "chl-a" / cm^2 * ")"),
-    sec.axis = sec_axis(
-      transform = ~ . / scale_factor,  # <-- must provide function
-      name = "Discharge (CFS)"
-    )
-  ) +
-  
-  scale_x_date(name = "Date") +
-  theme_bw()
-
-
-
-str(didymo_over_time)
-
-
-# Overlaying with SI
-Sampling_dates <- read_csv("Sampling_dates.csv")
-
-Sampling_dates <- Sampling_dates %>%
-  mutate(Sampling_date = mdy(Sampling_date))
-
-ggplot() +
-  # SI
-  geom_vline(
-    data = Sampling_dates,
-    aes(xintercept = Sampling_date, color = Occasion), 
-    linetype = "dashed",
-    linewidth = 0.3
-  ) +
-  scale_color_manual(values = c( # For better visuals on poster
-    MAY_2021 = "#B4C8A8",
-    MAY_2022 = "#B4C8A8",
-    MAY_2023 = "#B4C8A8",
-    MAY_2024 = "#B4C8A8",
-    MAY_2025 = "#B4C8A8",
-    AUG_2021 = "#EDBB8A",
-    AUG_2022 = "#EDBB8A",
-    AUG_2023 = "#EDBB8A",
-    AUG_2024 = "#EDBB8A",
-    AUG_2025 = "#EDBB8A",
-    OCT_2021 = "#DE8A5A",
-    OCT_2022 = "#DE8A5A",
-    OCT_2023 = "#DE8A5A",
-    OCT_2024 = "#DE8A5A",
-    OCT_2025 = "#DE8A5A")) +
-  
-  ## Hydrograph (scaled)
-  geom_line(
-    data = discharge_data,
-    aes(x = Date, y = Discharge_cfs * scale_factor),
-    color = "grey40",
-    linewidth = 0.8
-  ) +
-
-  ## Boxplots (grouped by sampling date)
-  geom_boxplot(
-    data = didymo_over_time,
-    aes(x = Sampling_date,
-        y = Concentration,
-        group = Sampling_date),
-    width = 3,
-    fill = "#2887A1",
-    color = "#008080",
-    alpha = 0.7
-  ) +
-  
-  ## Primary axis: concentration
-  scale_y_continuous(
-    name = expression("Diatom concentration (" * mu * "g " * "chl-a" / cm^2 * ")"),
-    sec.axis = sec_axis(
-      transform = ~ . / scale_factor,  # <-- must provide function
-      name = "Discharge (CFS)"
-    )
-  ) +
-  
-  scale_x_date(name = "Date") +
-  theme_bw() +
-  theme(
-    panel.grid = element_blank(),
-    panel.grid.minor = element_blank()
-    #axis.line = element_line(color = "black")
-  )
-
+# COLORS
 library(rcartocolor)
 install.packages(rcartocolor)
 mycolors <- carto_pal(7, "Earth")
