@@ -9,7 +9,7 @@ install.packages("quantreg")
 library(quantreg)
 
 # Set your working directory to your personal laptop
-setwd("~/Library/CloudStorage/OneDrive-Colostate/Data/BVR")
+setwd("~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR")
 
 # CSVs
 # From USGS Green Mountain Gauge--mean discharge from 10/1/2022-9/29/2025

@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r study1}
-dia_vel <-read.csv("~/Library/CloudStorage/OneDrive-Colostate/Data/BVR/diatom_velocity_RI.csv")
+dia_vel <-read.csv("~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/diatom_velocity_RI.csv")
 
 library(tidyverse)
 

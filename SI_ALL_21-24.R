@@ -16,7 +16,7 @@ library(ggplot2)
 library(dplyr)
 
 
-setwd("~/Library/CloudStorage/OneDrive-Colostate/Data/BVR")
+setwd("~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR")
 
 # IMPORT SIA DATA
 problems(SIA_ALL)
