@@ -23,15 +23,16 @@ knitr::opts_chunk$set(echo = TRUE)
 library(climwin)
 
 # Set your working directory to your personal laptop
-setwd("~/Library/CloudStorage/OneDrive-Colostate/Data/BVR")
+setwd("~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR")
 
 # CSVs
-# From USGS Green Mountain Gauge--mean discharge from 10/1/2022-9/29/2025
-discharge_data <- read.csv("discharge_data.csv") # Qualifier A means it was approved, P = provisional
+# From USGS Green Mountain Gauge--mean discharge from 10/1/2022-8/24/2026
+discharge_data <- read.csv("discharge_data_2026.csv")
 
 # Diatom conc. from benthotorch from 1/15/2023-8/27/2025
 # ALL available diatom data so far
-diatoms_discharge <- read.csv("diatoms_discharge.csv")
+diatoms_discharge <- read.csv("didymo_over_time.csv")
+
 
 # Convert dates to Date class because it can be finnicky otherwise
 discharge_data$Date <- as.Date(discharge_data$Date, format = "%m/%d/%Y")
@@ -61,8 +62,8 @@ head(SlidWin[[1]]$Dataset) # a sneak peak
 
 SlidWin[[1]]$BestModel # BestModel: is a model object showing the relationship between climate and biological date within the strongest climate window.
 
-# When climate = 0, the predicted value of diatoms is 0.600277
-# For each 1-unit increase in climate (e.g., 1 cfs of discharge), the model predicts an increase of 0.000894 units in diatom concentration.
+# When climate = 0, the predicted value of diatoms is 1.6779964
+# For each 1-unit increase in climate (e.g., 1 cfs of discharge), the model predicts a decrease of -0.0005184 units in diatom concentration.
 
 
 ```
@@ -143,7 +144,7 @@ SlidWin_single <- singlewin(xvar = list(climate = discharge_data$Discharge_cfs),
                             baseline = lme4::lmer(Concentration ~ 1 + (1|Site), 
                                                   data = diatoms_discharge),
                             cinterval = "day",
-                            range = c(3, 2),
+                            range = c(29, 20),
                             type = "relative", 
                             stat = c("max"), # choose max bc this was the best model output
                             func = "lin")

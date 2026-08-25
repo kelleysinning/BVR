@@ -64,7 +64,6 @@ discharge_data <- discharge_data %>%
          Qualifier = X_00060_00003_cd
   )
 
- # A, P = data qualifiers (approved, provisional) for Qualifier
 
 # BRINGING IN ALGAE DATA-------------------------------------------------------
 # to merge with discharge
@@ -124,7 +123,7 @@ discharge_data <- discharge_data %>%
 
 # This filters for all benthotorch data
 discharge_data <- discharge_data %>%
-  filter(Date > as.Date("2023-01-01") &
+  filter(Date > as.Date("2022-10-01") &
            Date < as.Date("2026-08-24"))
 
 
@@ -137,7 +136,11 @@ velocity_dates <- discharge_data %>%
   filter(velocity == "yes") %>%
   pull(Date)
 
+# Save to your current working directory
+write.csv(discharge_data, "discharge_data_2026.csv", row.names = FALSE)
 
+# Save to a specific folder path
+write.csv(discharge_data, "~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/discharge_data_2026.csv", row.names = FALSE)
 
 ggplot(discharge_data, aes(x = Date, y = Discharge_cfs)) +
   geom_line() +
@@ -181,7 +184,11 @@ didymo_over_time <- didymo_over_time %>%
 
 didymo_over_time$Sampling_date <- as.character(didymo_over_time$Sampling_date)
 
-str(didymo_over_time)
+# Save to your current working directory
+write.csv(didymo_over_time, "diatoms_over_time.csv", row.names = FALSE)
+
+# Save to a specific folder path
+write.csv(didymo_over_time, "~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/didymo_over_time.csv", row.names = FALSE)
 
 ggplot(didymo_over_time, aes(x = Sampling_date, y = Concentration, fill = Algae_Type)) +
   geom_boxplot(position = position_dodge(width = 0.8)) +  

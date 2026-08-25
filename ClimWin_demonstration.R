@@ -12,12 +12,12 @@ library(quantreg)
 setwd("~/Library/CloudStorage/OneDrive-Colostate/Data/BVR")
 
 # CSVs
-# From USGS Green Mountain Gauge--mean discharge from 10/1/2022-9/29/2025
-discharge_data <- read.csv("discharge_data.csv") # Qualifier A means it was approved, P = provisional
+# From USGS Green Mountain Gauge--mean discharge from 10/1/2022-8/24/2026
+discharge_data <- read.csv("discharge_data.csv") 
 
 # Diatom conc. from benthotorch from 1/15/2023-8/27/2025
 # ALL available diatom data so far
-diatoms_discharge <- read.csv("diatoms_discharge.csv")
+diatoms_discharge <- read.csv("diatoms_over_time.csv")
 
 # Convert dates to Date class
 discharge_data$Date <- as.Date(discharge_data$Date, format = "%m/%d/%Y")
