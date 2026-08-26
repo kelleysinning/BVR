@@ -121,7 +121,8 @@ discharge_data <- discharge_data %>%
          velocity = if_else(Date %in% velocity_dates, "yes", "no"))
 
 
-# This filters for all benthotorch data
+# This filters for all benthotorch data, only do this for benthotorch only data, if
+# looking at hydrograph below with SI sampling dates don't filter
 discharge_data <- discharge_data %>%
   filter(Date > as.Date("2022-10-01") &
            Date < as.Date("2026-08-24"))
@@ -136,7 +137,7 @@ velocity_dates <- discharge_data %>%
   filter(velocity == "yes") %>%
   pull(Date)
 
-# Save to your current working directory
+# Save to your current working directory, saving this for ClimWIN
 write.csv(discharge_data, "discharge_data_2026.csv", row.names = FALSE)
 
 # Save to a specific folder path
@@ -184,8 +185,8 @@ didymo_over_time <- didymo_over_time %>%
 
 didymo_over_time$Sampling_date <- as.character(didymo_over_time$Sampling_date)
 
-# Save to your current working directory
-write.csv(didymo_over_time, "diatoms_over_time.csv", row.names = FALSE)
+# Save to your current working directory, for ClimWin
+write.csv(didymo_over_time, "didymo_over_time.csv", row.names = FALSE)
 
 # Save to a specific folder path
 write.csv(didymo_over_time, "~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/didymo_over_time.csv", row.names = FALSE)
@@ -269,11 +270,13 @@ ggplot() +
     MAY_2023 = "#B4C8A8",
     MAY_2024 = "#B4C8A8",
     MAY_2025 = "#B4C8A8",
+    MAY_2026 = "#B4C8A8",
     AUG_2021 = "#EDBB8A",
     AUG_2022 = "#EDBB8A",
     AUG_2023 = "#EDBB8A",
     AUG_2024 = "#EDBB8A",
     AUG_2025 = "#EDBB8A",
+    AUG_2026 = "#EDBB8A",
     OCT_2021 = "#DE8A5A",
     OCT_2022 = "#DE8A5A",
     OCT_2023 = "#DE8A5A",
