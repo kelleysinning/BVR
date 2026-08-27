@@ -1,7 +1,7 @@
 ---
 title: "ClimWin Demonstration"
 author: "Kelley Sinning"
-date: "2025-11-23"
+date: "2026-08-27"
 output:
   html_document: default
   pdf_document: default
@@ -19,7 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r Getting Situated}
 # Install package
-# install.packages("climwin") put this in your console or else knitting will not work
+install.packages("climwin")# put this in your console or else knitting will not work
 library(climwin)
 
 # Set your working directory to your personal laptop
@@ -33,10 +33,9 @@ discharge_data <- read.csv("discharge_data_2026.csv")
 # ALL available diatom data so far
 diatoms_discharge <- read.csv("didymo_over_time.csv")
 
-
 # Convert dates to Date class because it can be finnicky otherwise
-discharge_data$Date <- as.Date(discharge_data$Date, format = "%m/%d/%Y")
-diatoms_discharge$Sampling_date <- as.Date(diatoms_discharge$Sampling_date, format = "%m/%d/%Y")
+discharge_data$Date <- as.Date(discharge_data$Date, format = "%Y-%m-%d")
+diatoms_discharge$Sampling_date <- as.Date(diatoms_discharge$Sampling_date, format = "%Y-%m-%d")
 
 
 ```
