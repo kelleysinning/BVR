@@ -777,4 +777,4 @@ library(readr)
 # for sliding window
 write_csv(discharge_data, "SI_discharge.csv") # discharge since start of study
 write_csv(NICHE_WIDTHS, "NICHE_WIDTHS_21to24.csv")
-write_csv(OVERLAP_DF, "OVERLAP.csv")
+writ
