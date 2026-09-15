@@ -30,6 +30,15 @@ SI_ALL_21-24.R: looking at niche overlap for bugs and fish
 
 SI_Fish_21-24.R: looking at niche overlap for BNT and MTS only
 
+# SEM
+## Working on consolidating all the datasheets into one place
+
+ALL_Bentho_Core.csv: benthotorch metasheet from 2023-present with paired velocity beginning in 2024 
+
+didymo_over_time.csv: all diatom data from 1/2023-Present, doesn't include velocity data
+
+discharge_data.csv: discharge data calculated from USGS gauges in Benthotorch-Velocity.R from
+4/1/21 before our first ever sampling event on 5/24/21
 
 # CLIMWIN
 
@@ -39,9 +48,21 @@ ClimWin_demonstration.R: Same as above but in R script
 
 SI_climwin.R: Sliding Window analysis for niche overlap and discharge--> revisit this sometime
 
-SI_discharge.csv: discharge begining in Jan 2020-Dec 2024, to give plenty of window before the first SI sampling event
+SI_discharge.csv: discharge begining in Jan 2020-Dec 2024, to give plenty of window before the first SI sampling event, created
+at bottom of SI_Fish_21-24.R
 
 didymo_over_time.csv: all diatom data from 1/2023-Present, doesn't include velocity data, used in ClimWin
 
-discharge_data_2026: discharge data calculated from USGS gauges in Benthotorch-Velocity.R, includes 10/1/2022-8/24/2026 so 
-that there is a solid window of time before benthotorch data began being collected in Jan. 2023, used in CLimWin
+discharge_data_bentho.csv: discharge data calculated from USGS gauges in Benthotorch-Velocity.R, filtered at line 129,
+includes 10/1/2022-8/24/2026 so that there is a solid window of time before benthotorch data began being 
+collected in Jan. 2023, used in CLimWin
+
+# DATA CLEANING
+
+Data Wrangling.R: where I will clean up thes messy big data sheets!
+
+BMI_SurberData.csv: surber data beginning in 2024-present
+
+Diet_Data.csv: Fish guy analysis beginning in May 2021 with the start of the project
+
+Meta_Field_Data.csv: All fish length, weight, IDs, species from all sampling occasions
