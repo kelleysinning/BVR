@@ -39,6 +39,9 @@ discharge_data <- discharge_data %>%
          Date = time
   )
 
+# Save to your current working directory, saving this for ClimWIN diatom-discharge relationships 
+# and SEM long-term flow
+write.csv(discharge_data, "discharge_data.csv", row.names = FALSE)
 
 # So using readNWISdv...it's older but works
 # More results than read_waterdata_dailybecause it includes provisional data
@@ -68,7 +71,7 @@ discharge_data <- discharge_data %>%
 # BRINGING IN ALGAE DATA-------------------------------------------------------
 # to merge with discharge
 
-setwd("~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR")
+setwd("~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/Diatom-Velocity")
 didymo_benthotorch <- read.csv("ALL_Bentho_Core.csv")
 didymo_benthotorch <- didymo_benthotorch %>%
   filter(!is.na(Sampling_date)) # removing NA columns that arose from comments in the csv
@@ -137,8 +140,6 @@ velocity_dates <- discharge_data %>%
   filter(velocity == "yes") %>%
   pull(Date)
 
-# Save to your current working directory, saving this for ClimWIN
-write.csv(discharge_data, "discharge_data_2026.csv", row.names = FALSE)
 
 # Save to a specific folder path
 write.csv(discharge_data, "~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/discharge_data_2026.csv", row.names = FALSE)
@@ -287,6 +288,7 @@ ggplot() +
   geom_line(
     data = discharge_data,
     aes(x = Date, y = Discharge_cfs * scale_factor),
+    expand = c(0, 0), # <-- Removes the default padding at the bottom and top
     color = "grey40",
     linewidth = 0.8
   ) +
@@ -780,6 +782,4 @@ anova(model)
 
 # COLORS
 library(rcartocolor)
-install.packages(rcartocolor)
-mycolors <- carto_pal(7, "Earth")
-mycolors
+install.packages(rcar

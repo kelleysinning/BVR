@@ -41,7 +41,4 @@ SI_climwin.R: Sliding Window analysis for niche overlap and discharge--> revisit
 
 SI_discharge.csv: discharge begining in Jan 2020-Dec 2024, to give plenty of window before the first SI sampling event
 
-didymo_over_time.csv: all diatom data from 1/2023-Present, doesn't include velocity data, used in ClimWin
-
-discharge_data_2026: discharge data calculated from USGS gauges in Benthotorch-Velocity.R, includes 10/1/2022-8/24/2026 so 
-that there is a solid window of time before benthotorch data began being collected in Jan. 2023, used in CLimWin
+didymo_over_time.csv: all diatom data from 1/2023-Present, doesn't include velocity data, used in Cl
