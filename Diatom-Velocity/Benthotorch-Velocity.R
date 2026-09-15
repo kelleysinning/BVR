@@ -782,4 +782,6 @@ anova(model)
 
 # COLORS
 library(rcartocolor)
-install.packages(rcar
+install.packages(rcartocolor)
+mycolors <- carto_pal(7, "Earth")
+mycolors
