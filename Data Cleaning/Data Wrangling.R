@@ -1,6 +1,8 @@
 # Kelley Sinning 9/15/2026
 # Cleaning up all the manjor datasheets so they can be used in an analysis together!
 
+# trying something
+
 library(ggplot2)
 library(dplyr)
 library(tidyr)
@@ -17,3 +19,4 @@ fish <- read.csv("Meta_Field_Data.csv")
 diets <- diets %>%
   select(-Initials, -Date_entered, -IDer, -ID_date, -Occasion, -Diet_observation_number,
          -Measurement_mm,-Extra_counts, -Empty_case_mm, -PROOFED, -USE_SAMPLE, -Total_Sampled, -X)
+
