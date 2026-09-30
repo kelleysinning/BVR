@@ -19,7 +19,7 @@ Benthotorch-Velocity.R to overlay hydrograph with SI and benthotorching
 
 Meta_SIA_Data.csv:all up to date SIA data for fish and bugs
 
-NICHE_WIDTHS_21to24.csv:niche widths for MTS and BNT across sampling seasons and years from 2021-2024
+NICHE_WIDTHS_21to24.csv: niche widths for MTS and BNT across sampling seasons and years from 2021-2024
 
 OVERLAP.csv: niche overlap for MTS and BNT across sampling seasons and years from 2021-2024
 
@@ -39,6 +39,8 @@ didymo_over_time.csv: all diatom data from 1/2023-Present, doesn't include veloc
 
 discharge_data.csv: discharge data calculated from USGS gauges in Benthotorch-Velocity.R from
 4/1/21 before our first ever sampling event on 5/24/21
+
+OVERLAP.csv: niche overlap for MTS and BNT across sampling seasons and years from 2021-2024
 
 # CLIMWIN
 
