@@ -215,3 +215,6 @@ sum(is.na(SECPROD$Biomass.mg))
         mutate(Biomass.Area.Corrected = Biomass.g*Density) # Making biomass.area.corrected column
       # Saving as a CSV for geom_ridge code
       write.csv(SECPROD, "SEC_PROD.csv", row.names = FALSE)
+      
+      
+# next biomass, FFGs, summarizing per sampling occassion, left join diets with fish ID codes to assign species
