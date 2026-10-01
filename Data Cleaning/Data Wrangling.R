@@ -252,6 +252,7 @@ diets <- diets %>%
     TRUE ~ NA_character_
   ))
 
+# First, we want to crunch this down to one fish with summed abundance, density, biomass, FFG metrics, diversity
 
 # Ultimately, we'd want to join this with fish and say if it has a diet it also has a column for diversity of diet, 
 # # of diet items, % scrapers
