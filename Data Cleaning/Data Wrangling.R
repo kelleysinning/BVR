@@ -19,9 +19,9 @@ fish <- read.csv("Meta_Field_Data.csv")
 diets <- diets %>%
   select(-Initials, -Date_entered, -IDer, -ID_date, -Occasion, -Diet_observation_number,
          -Measurement_mm,-Extra_counts, -Empty_case_mm, -PROOFED, -USE_SAMPLE, -Total_Sampled, -X,
-         -NOTES) %>%
+         -NOTES) %>% # With this move, we are disregarding empty cases, look deeper into this and maybe delete the whole row if this is a thing
   mutate(across(measurement_1:measurement_10, ~ as.numeric(as.character(.x)))) %>%
-  mutate(Length_mean_mm = rowMeans(select(., measurement_1:measurement_10), na.rm = TRUE)) %>%
+  mutate(Measurement_mean_mm= rowMeans(select(., measurement_1:measurement_10), na.rm = TRUE)) %>%
   select(-(measurement_1:measurement_10)) %>%
   rename(Abundance = Total.Measured)
 
@@ -47,10 +47,12 @@ diets <- diets %>%
                             c("insecta") ~ "Insecta",
                             c("Coleoptera ") ~ "Coleoptera",
                             c("Aquatic mite", "Hydrachidae") ~ "Hydrachnidae",
-                            c("Trombiditonnes", "Trombidiformes") ~ "Ant",
+                            c("Trombiditonnes", "Trombidiformes", "Ant") ~ "Formicidae",
                             c("Hirudinea") ~ "Leech",
                             c("gastropoda") ~ "Gastropoda",
                             c("Polychaeta") ~ "Oligochaeta",
+                            "Crangonyctidae" ~ "Amphipoda",
+                            c("Turbellaria","Planariidae") ~ "Planarian",
                             default = Order))
                             
 unique(diets$Order) # check this for more fixes as data is added    
@@ -92,129 +94,156 @@ diets <- diets %>%
                                 "Homoptera" ~ "Hemiptera",
                                 "Nemouridae " ~ "Nemouridae",
                                 "Tabanidae " ~ "Tabanidae",
+                                "Planariidae" ~ "Planarian",
                                 default = Family))
 
 unique(diets$Family) # check this for more fixes as data is added    
 
-# For biomass
-ADDING IN LENGTH-MASS EQUATIONS
-SECPROD <- SECPROD %>%
+# Making a new column for highest taxonomic resolution
+diets <- diets %>%
+  mutate(
+    Family = na_if(trimws(Family), ""),
+    Order  = na_if(trimws(Order), ""),
+    Taxon  = coalesce(Family, Order)
+  )
+
+# Adding in length-mass equations; assigning biomass to highest taxonomic resolution
+diets <- diets %>% # First, convert these to numeric
+  mutate(
+    Measurement_mean_mm = as.numeric(as.character(Measurement_mean_mm)),
+    Abundance = as.numeric(as.character(Abundance))
+  )
+
+diets <- diets %>%
   mutate(
     Biomass.mg = case_when(
-      Genus == "Acentrella" ~ (0.00962 * (Length ^ 2.75)) * Abundance,
-      Genus == "Acerpenna" ~ (0.0076 * (Length ^ 2.691)) * Abundance,
-      Genus == "Acroneuria" ~ (0.0019 * (Length ^ 3.232)) * Abundance,
-      Genus == "Allocapnia" ~ (0.004 * (Length ^ 2.487)) * Abundance,
-      Genus == "Allognasta" ~ (0.0032 * (Length ^ 2.61)) * Abundance,
-      Genus == "Alloperla" ~ (0.0062 * (Length ^ 2.724)) * Abundance,
-      Genus == "Ameletus" ~ (0.0077 * (Length ^ 2.588)) * Abundance,
-      Genus == "Amphinemura" ~ (0.004 * (Length ^ 2.975)) * Abundance,
-      Genus == "Antocha" ~ (0.0041 * (Length ^ 2.4439)) * Abundance,
-      Genus == "Atherix" ~ (0.0038 * (Length ^ 2.586)) * Abundance,
-      Genus == "Attenella" ~ (0.00928 * (Length ^ 2.9)) * Abundance,
-      Genus == "Baetis" ~ (0.0076 * (Length ^ 2.691)) * Abundance,
-      Genus == "Baetidae" ~ (0.0076 * (Length ^ 2.691)) * Abundance,
-      Genus == "Baetisca" ~ (0.0116 * (Length ^ 2.905)) * Abundance,
-      Genus == "Boyeria" ~ (0.0082 * (Length ^ 2.813)) * Abundance,
-      Genus == "Calopteryx" ~ (0.005 * (Length ^ 2.742)) * Abundance,
-      Genus == "Cernotina" ~ (0.0071 * (Length ^ 2.531)) * Abundance, # Polycentropodidae family
-      Genus == "Chauliodes" ~ (0.0062 * (Length ^ 2.691)) * Abundance,
-      Genus == "Chelifera" ~ (0.004 * (Length ^ 2.655)) * Abundance,
-      Genus == "Cheumatopsyche" ~ (0.0045 * (Length ^ 2.721)) * Abundance,
-      Genus == "Chimarra" ~ (0.0044 * (Length ^ 2.652)) * Abundance,
-      Genus == "Chironomini" ~ (0.0007 * (Length ^ 2.952)) * Abundance,
-      Genus == "Collembola" ~ (0.0024 * (Length ^ 3.676)) * Abundance,
-      Genus == "Cordulegaster" ~ (0.0067 * (Length ^ 2.782)) * Abundance,
-      Genus == "Cyrnellus" ~ (0.0071 * (Length ^ 2.531)) * Abundance,
-      Genus == "Dicranota" ~ (0.0027 * (Length ^ 2.637)) * Abundance,
-      Genus == "Diplectrona" ~ (0.0049 * (Length ^ 2.62)) * Abundance,
-      Genus == "Discocerina" ~ (0.00033 * (Length ^ 3.55)) * Abundance,
-      Genus == "Dixa" ~ (0.0433 * (Length ^ 0)) * Abundance,
-      Genus == "Dixella" ~ (0.0433 * (Length ^ 0)) * Abundance,
-      Genus == "Dolophilodes" ~ (0.00408 * (Length ^ 2.82)) * Abundance,
-      Genus == "Ectopria" ~ (0.0164 * (Length ^ 2.929)) * Abundance,
-      Genus == "Eloeophila" ~ (0.0014 * (Length ^ 2.667)) * Abundance,
-      Genus == "Ephemera" ~ (0.0021 * (Length ^ 2.737)) * Abundance,
-      Genus == "Epeorus" ~ (0.0121 * (Length ^ 2.667)) * Abundance,
-      Genus == "Eriopterini" ~ (0.0016 * (Length ^ 2.914)) * Abundance, # Limoniidae family
-      Genus == "Eurylophella" ~ (0.008 * (Length ^ 2.663)) * Abundance,
-      Genus == "Gerris" ~ (0.015 * (Length ^ 2.596)) * Abundance,
-      Genus == "Glossosoma" ~ (0.0092 * (Length ^ 2.888)) * Abundance,
-      Genus == "Goera" ~ (0.00156 * (Length ^ 2.75)) * Abundance,
-      Genus == "Gomphus" ~ (00.044 * (Length ^ 3.124)) * Abundance,
-      Genus == "Gyrinus" ~ (0.0531 * (Length ^ 2.586)) * Abundance, # Dineutes sp. from Benke
-      Genus == "Hagenella" ~ (0.0054 * (Length ^ 2.811)) * Abundance, # Ptilostomis from Benke
-      Genus == "Hemiptera" ~ (0.00836 * (Length ^ 3.075)) * Abundance,
-      Genus == "Hetaerina" ~ (0.005 * (Length ^ 2.742)) * Abundance,
-      Genus == "Helichus" ~ (0.0011 * (Length ^ 3.1)) * Abundance,
-      Genus == "Hexatoma" ~ (0.0042 * (Length ^ 2.596)) * Abundance,
-      Genus == "Hydatophylax" ~ (0.0049 * (Length ^ 2.85)) * Abundance,
-      Genus == "Hydropsyche" ~ (0.0051 * (Length ^ 2.824)) * Abundance,
-      Genus == "Isonychia" ~ (0.0031 * (Length ^ 3.167)) * Abundance,
-      Genus == "Isoperla" ~ (0.01 * (Length ^ 2.658)) * Abundance,
-      Genus == "Langessa" ~ (0.00271 * (Length ^ 2.959)) * Abundance, # Lepidoptera from Greg's sheet 
-      Genus == "Lanthus" ~ (0.0097 * (Length ^ 2.895)) * Abundance,
-      Genus == "Lepidostoma" ~ (0.0079 * (Length ^ 2.649)) * Abundance,
-      Genus == "Leuctra" ~ (0.003 * (Length ^ 2.761)) * Abundance,
-      Genus == "Limnephilidae" ~ (0.0049 * (Length ^ 2.85)) * Abundance,
-      Genus == "Limnophila" ~ (0.0014 * (Length ^ 2.667)) * Abundance,
-      Genus == "Limoniidae" ~ (0.0016 * (Length ^ 2.914)) * Abundance,
-      Genus == "Lypodiversa" ~ (0.0039 * (Length ^ 2.873)) * Abundance, # Polycentropodidae family
-      Genus == "Micrasema" ~ (0.0181 * (Length ^ 2.410)) * Abundance,
-      Genus == "Microvelia" ~ (0.0083 * (Length ^ 2.777)) * Abundance,
-      Genus == "Molophilus" ~ (0.0016 * (Length ^ 2.914)) * Abundance, 
-      Genus == "Neocleon" ~ (0.0076 * (Length ^ 2.691)) * Abundance,# Baetis formula
-      Genus == "Neophylax" ~ (0.0049 * (Length ^ 2.85)) * Abundance,
-      Genus == "Neoplasta" ~ (0.004 * (Length ^ 2.655)) * Abundance,
-      Genus == "Nigronia" ~ (0.0062 * (Length ^ 2.691)) * Abundance,
-      Genus == "Optioservus" ~ (0.0039 * (Length ^ 2.96)) * Abundance,
-      Genus == "Oreogeton" ~ (0.0033 * (Length ^ 2.392)) * Abundance,
-      Genus == "Orthocladine" ~ (0.002 * (Length ^ 2.254)) * Abundance,
-      Genus == "Oulimnius" ~ (0.0138 * (Length ^ 2.5548)) * Abundance,
-      Genus == "Paracapnia" ~ (0.004 * (Length ^ 2.487)) * Abundance,
-      Genus == "Paraleptophlebia" ~ (0.0038 * (Length ^ 2.918)) * Abundance,
-      Genus == "Polycentropodidae" ~ (0.0071 * (Length ^ 2.531)) * Abundance,
-      Genus == "Polycentropus" ~ (0.0071 * (Length ^ 2.531)) * Abundance,
-      Genus == "Probezzia" ~ (0.0033 * (Length ^ 2.392)) * Abundance,
-      Genus == "Prodaticus" ~ (0.1029 * (Length ^ 0)) * Abundance,
-      Genus == "Prosimulium" ~ (0.0012 * (Length ^ 3.19)) * Abundance, 
-      Genus == "Prostoia" ~ (0.004 * (Length ^ 2.975)) * Abundance,
-      Genus == "Psephenus" ~ (0.0077 * (Length ^ 2.883)) * Abundance,
-      Genus == "Pseudolimnophila" ~ (0.0014 * (Length ^ 2.667)) * Abundance,
-      Genus == "Pteronarcys" ~ (0.0064 * (Length ^ 2.845)) * Abundance,
-      Genus == "Pycnopsyche" ~ (0.0049 * (Length ^ 2.85)) * Abundance,
-      Genus == "Psychodini" ~ (0.0007 * (Length ^ 2.592)) * Abundance, # Chironomini equation
-      Genus == "Remenus" ~ (0.0119 * (Length ^ 2.695)) * Abundance,
-      Genus == "Rhagovelia" ~ (0.0083 * (Length ^ 2.777)) * Abundance,
-      Genus == "Rhyacophila" ~ (0.0099 * (Length ^ 2.48)) * Abundance,
-      Genus == "Sialis" ~ (0.0031 * (Length ^ 2.801)) * Abundance,
-      Genus == "Simulium" ~ (0.004 * (Length ^ 2.807)) * Abundance,
-      Genus == "Stenelmis" ~ (0.0111 * (Length ^ 2.49)) * Abundance,
-      Genus == "Stenonema" ~ (0.0128 * (Length ^ 2.616)) * Abundance, 
-      Genus == "Stratiomyidae" ~ (0.005 * (Length ^ 2.591)) * Abundance,
-      Genus == "Stylogomphus" ~ (0.0097 * (Length ^ 2.895)) * Abundance,
-      Genus == "Tallaperla" ~ (0.0194 * (Length ^ 2.853)) * Abundance,
-      Genus == "Taeniopteryx" ~ (0.0067 * (Length ^ 2.711)) * Abundance,
-      Genus == "Tanypodinae" ~ (0.0038 * (Length ^ 0.0006)) * Abundance,
-      Genus == "Tanytarsini" ~ (0.0008 * (Length ^ 2.728)) * Abundance,
-      Genus == "Tipula" ~ (0.0064 * (Length ^ 2.443)) * Abundance, 
-      Genus == "Triacanthagyna" ~ (0.0082 * (Length ^ 2.813)) * Abundance, # Using Boyeria from Benke
-      Genus == "Wormaldia" ~ (0.0044 * (Length ^ 2.652)) * Abundance,
-      Genus == "Zoraena" ~ (0.0067 * (Length ^ 2.782)) * Abundance, # Family Cordulegaster
+      Taxon == "Ephemeroptera" ~ (0.0066 * (Measurement_mean_mm ^ 2.88)) * Abundance,
+      Taxon == "Trichoptera" ~ (0.0019 * (Measurement_mean_mm ^ 3.12)) * Abundance,
+      Taxon == "Diptera" ~ (0.00096 * (Measurement_mean_mm ^ 3)) * Abundance,
+      Taxon == "Plecoptera" ~ (0.0023 * (Measurement_mean_mm ^ 2.45)) * Abundance,
+      Taxon == "Terrestrial" ~ (0.04142 * (Measurement_mean_mm ^ 2.213)) * Abundance, # dipteran adults
+      Taxon == "Ostracoda" ~ (0.0484 * (Measurement_mean_mm ^ 1.943)) * Abundance,
+      Taxon == "Asellidae" ~ (0.0072 * (Measurement_mean_mm ^ 2.785)) * Abundance,
+      Taxon == "Coleoptera" ~ (0.0035 * (Measurement_mean_mm ^ 2.4033)) * Abundance,
+      Taxon == "Gastropoda" ~ (0.172 * (Measurement_mean_mm ^ 1.688)) * Abundance,
+      Taxon == "Turbellaria" ~ (0.0089 * (Measurement_mean_mm ^ 2.145)) * Abundance,
+      Taxon == "Odonata" ~ (0.01399 * (Measurement_mean_mm ^ 2.78)) * Abundance,
+      Taxon == "Oligochaeta" ~ (0.00241 * (Measurement_mean_mm ^ 1.875)) * Abundance,
+      Taxon == "Hemiptera" ~ (0.00836 * (Measurement_mean_mm ^ 3.075)) * Abundance,
+      Taxon == "Araneae" ~ (0.1044 * (Measurement_mean_mm ^ 2.296)) * Abundance,
+      Taxon == "Leech" ~ (0.0071 * (Measurement_mean_mm ^ 2.531)) * Abundance, # come back
+      Taxon == "Hymenoptera" ~ (0.01379 * (Measurement_mean_mm ^ 2.696)) * Abundance,
+      Taxon == "Lepidoptera" ~ (0.00271 * (Measurement_mean_mm ^ 2.959)) * Abundance, # put this as larval but is it more likely to be adult?
+      #Taxon == "Planariidae" ~ ( * (Measurement_mean_mm ^ )) * Abundance, # NA
+      #Taxon == "Hydrachnidae" ~ ( * (Measurement_mean_mm ^ )) * Abundance, # NA
+      #Taxon == "Amphipoda" ~ ( * (Measurement_mean_mm ^ )) * Abundance,# NA
+      
+      Taxon == "Baetidae" ~ (0.0076 * (Measurement_mean_mm ^ 2.691)) * Abundance,
+      Taxon == "Lepidostomatidae" ~ (0.0079 * (Measurement_mean_mm ^ 2.649)) * Abundance,
+      Taxon == "Brachycentridae" ~ (0.0024 * (Measurement_mean_mm ^ 3.676)) * Abundance, # check old code
+      Taxon == "Rhyacophilidae" ~ (0.0024 * (Measurement_mean_mm ^ 3.676)) * Abundance,# check old code
+      Taxon == "Perlodidae" ~ (0.01 * (Measurement_mean_mm ^ 2.658)) * Abundance,
+      Taxon == "Chironomidae" ~ (0.0006 * (Measurement_mean_mm ^ 2.77)) * Abundance,
+      Taxon == "Chloroperlidae" ~ (0.0062 * (Measurement_mean_mm ^ 2.724)) * Abundance,
+      Taxon == "Tabanidae" ~ (0.005 * (Measurement_mean_mm ^ 2.591)) * Abundance,
+      Taxon == "Ephemerellidae" ~ (0.00928 * (Measurement_mean_mm ^ 2.9)) * Abundance,
+      Taxon == "Glossosomatidae" ~ (0.0024 * (Measurement_mean_mm ^ 2.616)) * Abundance, #old code
+      Taxon == "Heptageniidae" ~ (0.0128 * (Measurement_mean_mm ^ 2.616)) * Abundance,
+      Taxon == "Hydropsychidae" ~ (0.0049 * (Measurement_mean_mm ^ 2.62)) * Abundance,
+      Taxon == "Simuliidae" ~ (0.0048 * (Measurement_mean_mm ^ 2.55)) * Abundance,
+      Taxon == "Tipulidae" ~ (0.00392 * (Measurement_mean_mm ^ 2.4403)) * Abundance,
+      Taxon == "Perlidae" ~ (0.003 * (Measurement_mean_mm ^ 3.232)) * Abundance,
+      Taxon == "Araneae" ~ (0.1044 * (Measurement_mean_mm ^ 2.296)) * Abundance,
+      Taxon == "Athericidae" ~ (0.0024 * (Measurement_mean_mm ^ 3.676)) * Abundance, #check old code
+      Taxon == "Asellidae" ~ (0.0072 * (Measurement_mean_mm ^ 2.785)) * Abundance,
+      Taxon == "Elmidae" ~ (0.0111 * (Measurement_mean_mm ^ 2.49)) * Abundance,
+      Taxon == "Formicidae" ~ (0.00885 * (Measurement_mean_mm ^ 2.919)) * Abundance,
+      Taxon == "Hemiptera" ~ (0.00836 * (Measurement_mean_mm ^ 3.075)) * Abundance,
+      Taxon == "Hydrophilidae" ~ (0.0024 * (Measurement_mean_mm ^ 2.2)) * Abundance,
+      Taxon == "Gomphidae" ~ (0.0044 * (Measurement_mean_mm ^ 3.124)) * Abundance,
+      Taxon == "Dytiscidae" ~ (0.1029 * (Measurement_mean_mm ^ 0)) * Abundance,
+      Taxon == "Capniidae" ~ (0.004 * (Measurement_mean_mm ^ 2.487)) * Abundance,
+      Taxon == "Cicadellidae" ~ (0.02387 * (Measurement_mean_mm ^ 2.561)) * Abundance, # leaf hoppers
+      Taxon == "Coleoptera" ~ (0.0035 * (Measurement_mean_mm ^ 2.4033)) * Abundance,
+      Taxon == "Leptophlebiidae" ~ (0.0054 * (Measurement_mean_mm ^ 2.836)) * Abundance,
+      Taxon == "Physidae" ~ (0.172 * (Measurement_mean_mm ^ 1.688)) * Abundance, # using gastropoda
+      Taxon == "Hydroptilidae" ~ (0.01268 * (Measurement_mean_mm ^ 2.901)) * Abundance,
+      Taxon == "Muscidae" ~ (0.00033 * (Measurement_mean_mm ^ 3.55)) * Abundance,
+      Taxon == "Diptera" ~ (0.00096 * (Measurement_mean_mm ^ 3)) * Abundance, # using larva
+      Taxon == "Gastropoda" ~ (0.172 * (Measurement_mean_mm ^ 1.688)) * Abundance,
+      Taxon == "Terrestrial" ~ (0.04142 * (Measurement_mean_mm ^ 2.213)) * Abundance, # dipteran adults
+      Taxon == "Oligochaeta" ~ (0.00241 * (Measurement_mean_mm ^ 1.875)) * Abundance,
+      Taxon == "Aphididae" ~ (0.0598 * (Measurement_mean_mm ^ 1.724)) * Abundance,
+      Taxon == "Nemouridae" ~ (0.004 * (Measurement_mean_mm ^ 2.975)) * Abundance,
+      Taxon == "Pteronarcyidae" ~ (0.0064 * (Measurement_mean_mm ^ 2.845)) * Abundance,
+      Taxon == "Limoniidae" ~ (0.00392 * (Measurement_mean_mm ^ 2.4403)) * Abundance, 
+      Taxon == "Stratiomyidae" ~ (0.005 * (Measurement_mean_mm ^ 2.591)) * Abundance,
+      Taxon == "Empididae" ~ (0.004 * (Measurement_mean_mm ^ 2.655)) * Abundance,
+      #Taxon == "Crangonyctidae" ~ ( * (Measurement_mean_mm ^ )) * Abundance, # NA
+      #Taxon == "Fry" ~ ( * (Measurement_mean_mm ^ )) * Abundance, # NA
+      #Taxon == "Fish egg" ~ ( * (Measurement_mean_mm ^ )) * Abundance, # NA
+      #Taxon == "Hydrachnidae" ~ ( * (Measurement_mean_mm ^ )) * Abundance, # NA
+      #Taxon == "Cyclorrhapha" ~ ( * (Measurement_mean_mm ^ )) * Abundance, # NA
+      #Taxon == "Notonectidae" ~ ( * (Measurement_mean_mm ^ )) * Abundance, # NA
+      #Taxon == "Vespidae" ~ ( * (Measurement_mean_mm ^ )) * Abundance, #NA
+      #Taxon == "Planariidae" ~ ( * (Measurement_mean_mm ^ )) * Abundance, # NA
       TRUE ~ NA_real_  # Assign NA for genera not specified
     ))
 
-# checking for NAs, should be zero!
-sum(is.na(SECPROD$Biomass.mg))
+      
+# Now, let's add a new Density column, then use it to correct biomass by area
+diets <- diets %>% 
+        mutate(Density = Abundance / 0.0929) %>% # Making density column based on 30 cm x 30 cm surber area --> .09 m^2
+        mutate(Biomass.g = Biomass.mg / 1000) %>% # Biomass was in mg bc of the Measurement_mean_mm mass regressions, divide by 1000 to get to g
+        mutate(Biomass.Area.Corrected = Biomass.g*Density) %>% # Making biomass.area.corrected column
+        select(-Biomass.mg, -Biomass.g)
+      
+# Lovely!!
+# Now, let's assign some coarse FFGs
 
-      
-      # Finally, let's add a new Density column, then use it to correct biomass by area
-      SECPROD <- SECPROD %>% 
-        mutate(Density = Abundance / 0.0929) %>% # Making density column
-        mutate(Biomass.g = Biomass.mg / 1000) %>% # Biomass was in mg bc of the length mass regressions, divide by 1000 to get to g
-        mutate(Biomass.Area.Corrected = Biomass.g*Density) # Making biomass.area.corrected column
-      # Saving as a CSV for geom_ridge code
-      write.csv(SECPROD, "SEC_PROD.csv", row.names = FALSE)
-      
-      
+diets <- diets %>%
+  mutate(     FFG = case_when(
+    # Collector-gatherers
+    Taxon %in% c("Ephemeroptera", "Baetidae", "Leptophlebiidae", "Ephemerellidae",
+                 "Diptera", "Chironomidae", "Stratiomyidae", "Elmidae",
+                 "Ostracoda", "Oligochaeta") ~ "Collector-gatherer",
+    
+    # Collector-filterers
+    Taxon %in% c("Hydropsychidae", "Brachycentridae", "Simuliidae") ~ "Collector-filterer",
+    
+    # Scrapers
+    Taxon %in% c("Heptageniidae", "Glossosomatidae", "Hydroptilidae",
+                 "Gastropoda", "Physidae") ~ "Scraper",
+    
+    # Shredders
+    Taxon %in% c("Lepidostomatidae", "Tipulidae", "Limoniidae", "Capniidae",
+                 "Nemouridae", "Pteronarcyidae", "Asellidae",
+                 "Amphipoda", "Lepidoptera") ~ "Shredder",
+    
+    # Predators
+    Taxon %in% c("Rhyacophilidae", "Perlodidae", "Chloroperlidae", "Perlidae",
+                 "Plecoptera", "Tabanidae", "Athericidae", "Empididae", "Muscidae",
+                 "Dytiscidae", "Hydrophilidae", "Coleoptera",
+                 "Gomphidae", "Odonata", "Hemiptera",
+                 "Turbellaria", "Leech", "Araneae") ~ "Predator",
+    
+    # Terrestrial inputs (not aquatic feeding groups)
+    Taxon %in% c("Terrestrial", "Formicidae", "Hymenoptera", "Ant",
+                 "Aphididae", "Cicadellidae") ~ "Terrestrial",
+    
+    # Taxa with no biomass equation (the commented-out lines above)
+    Taxon == "Crangonyctidae" ~ "Shredder",     # amphipod; often gatherer/shredder
+    Taxon == "Hydrachnidae"   ~ "Predator",     # water mites
+    Taxon == "Cyclorrhapha"   ~ "Predator",     # mixed; adjust if mostly adults
+    Taxon == "Notonectidae"   ~ "Predator",     # backswimmers
+    Taxon == "Planariidae"    ~ "Predator",     # flatworms
+    Taxon == "Vespidae"       ~ "Terrestrial",  # wasps
+    Taxon == "Fry"            ~ "Predator",     # fish; change to NA if you'd rather exclude
+    Taxon == "Fish egg"       ~ NA_character_,  # not a feeding group
+    
+    # Mixed at order level, needs a decision
+    Taxon == "Trichoptera" ~ NA_character_,
+    
+    TRUE ~ NA_character_
+  ))
 # next biomass, FFGs, summarizing per sampling occassion, left join diets with fish ID codes to assign species
