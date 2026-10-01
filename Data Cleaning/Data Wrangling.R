@@ -196,8 +196,13 @@ diets <- diets %>%
         mutate(Density = Abundance / 0.0929) %>% # Making density column based on 30 cm x 30 cm surber area --> .09 m^2
         mutate(Biomass.g = Biomass.mg / 1000) %>% # Biomass was in mg bc of the Measurement_mean_mm mass regressions, divide by 1000 to get to g
         mutate(Biomass.Area.Corrected = Biomass.g*Density) %>% # Making biomass.area.corrected column
+        #filter(!is.na(Biomass.Area.Corrected)) %>% # Removing NAs bc that'd mean data was never entered, casualty of a messy dataset
         select(-Biomass.mg, -Biomass.g)
-      
+
+# How to clean this up? Should we?
+# No biomass just means there wasn't an equation for it, which is a good bit of taxa
+# No abundance means its empty, which is information
+
 # Lovely!!
 # Now, let's assign some coarse FFGs
 
@@ -246,4 +251,10 @@ diets <- diets %>%
     
     TRUE ~ NA_character_
   ))
-# next biomass, FFGs, summarizing per sampling occassion, left join diets with fish ID codes to assign species
+
+
+# Ultimately, we'd want to join this with fish and say if it has a diet it also has a column for diversity of diet, 
+# # of diet items, % scrapers
+
+# Next, summarize by sample occasions left join diets with fish ID codes to assign species
+
