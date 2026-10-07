@@ -1,0 +1,487 @@
+---
+title: "DIET COMPOSITION ANALYSIS"
+author: "Nitsa"
+date: "2023-02-05"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r, echo=FALSE, message=FALSE}
+# LOAD PACKAGES
+library(tidyverse)
+library(knitr)
+library(vegan)
+library(dplyr)
+library(EcolUtils)
+library(RVAideMemoire)
+library(ecodist)
+```
+
+
+```{r, message=FALSE, include = FALSE, echo=FALSE}
+# UPLOAD DATA
+DIET <- read_csv("DIET_DATA.csv")
+
+# SUM PREY GROUP FREQUENCY & DRY MASS PER INDIVUDAL
+PREY_DIET <- DIET %>%
+  group_by(Sample_ID, PREY_GROUP) %>%
+  mutate(prey_n = n(),
+         prey_dm = sum(Dry_mass)) %>%
+  distinct_at(vars(Sample_ID, PREY_GROUP), .keep_all = TRUE) %>%
+  select(-c(Dry_mass)) %>%
+  mutate(SEASON_PREDATOR = paste(Occasion, Species, sep = "_")) %>% # predictor variable
+  select(-c(prey_n, Occasion))  %>%
+  mutate(Group = Sample_ID) %>%
+  select(Group, SEASON_PREDATOR, year, season, Sample_location, Species, PREY_GROUP, prey_dm) %>%
+  mutate(prey_dm_4 = prey_dm^(1/4)) %>%
+  select(-c(prey_dm)) %>%
+  as.data.frame() %>%
+  select(-c(Sample_ID))
+
+# COUNT NUMBER OF DIETS
+SCA_SAMPLE_SIZE <- PREY_DIET %>%
+  select(Group, Species, PREY_GROUP) %>%
+  distinct_at(vars(Group), .keep_all = TRUE) %>%
+  group_by(Species) %>%
+  mutate(SCA_N = n_distinct(Group)) %>%
+  mutate(EMPTY = case_when(
+    PREY_GROUP == "EMPTY" ~ "1",
+    PREY_GROUP != "EMPTY" ~ "0")) %>%
+  mutate(EMPTY = as.numeric(EMPTY)) %>%
+  group_by(Species) %>%
+  mutate(EMPTY_N = sum(EMPTY)) %>%
+  mutate(PROP_EMPTY = EMPTY_N/SCA_N ) %>%
+  distinct_at(vars(Species), .keep_all = TRUE) %>%
+  select(Species, SCA_N, EMPTY_N, PROP_EMPTY)
+
+# REMOVE
+rm(SCA_SAMPLE_SIZE)
+
+# PIVOT WIDER
+WIDE_DATA <- PREY_DIET %>%
+  filter(PREY_GROUP != "EMPTY") %>%
+  pivot_wider(names_from = PREY_GROUP, values_from = prey_dm_4, values_fill = 0) 
+
+# PREDICTOR VARIABLES
+DIET_PREDICT <- WIDE_DATA %>% 
+  select(Group, year, season, Sample_location, Species, SEASON_PREDATOR)
+
+# MATRIX
+DIET_MATRIX <- WIDE_DATA %>% 
+  select(-c(Species, year, season, Sample_location, SEASON_PREDATOR)) %>%
+  column_to_rownames("Group") %>%
+  as.matrix()
+
+# REMOVE
+rm(WIDE_DATA)
+```
+
+```{r, include=FALSE, message = FALSE}
+# "A rule of thumb: stress < 0.05 provides an excellent representation in reduced dimensions, < 0.1 is great, <0.2 is good/ok, and stress < 0.3 provides a poor representation."
+# metaMDS repeats algortihim about 20 different times -- trying to find the smallest stress value 
+# stress = the amount of distortion that happens when you take highly dimensional data and smush it down into 2 dimensions
+
+# BRAY-CURTIS DISTANCE MATRIX
+set.seed(02091997)
+DIET_DIST_DM <- vegdist(DIET_MATRIX, method="bray")
+
+# NMDS
+set.seed(02091997)
+DIET_MDS_DM <- metaMDS(DIET_DIST_DM, distance = "bray", autotransform = FALSE) 
+
+# STRESS LEVEL
+DIET_NMDS_STRESS <- DIET_MDS_DM$stress
+
+# DATAFRAME
+DIET_DIST <- DIET_MDS_DM %>%
+  scores() %>%
+  as_tibble(rownames = "Group")
+
+# MERGE DATA
+META_DIET_MDS_DM <- inner_join(DIET_PREDICT, DIET_DIST)
+write.csv(META_DIET_MDS_DM, "\\NMDS2.csv", row.names=FALSE)
+```
+
+# TEST FOR DIFFERENCES IN DIET COMPOSITION BETWEEN GROUPS
+## PERMANOVA 
+```{r, echo = FALSE, include = FALSE}
+#### ADONIS2 ####
+# DIFFERENCES BETWEEN PREDATOR GROUPS & SEASONS
+PERMANOVA_DM <- adonis2(DIET_DIST_DM ~ 
+                          META_DIET_MDS_DM$Species * META_DIET_MDS_DM$season + 
+                          META_DIET_MDS_DM$season +
+                          META_DIET_MDS_DM$year + 
+                          META_DIET_MDS_DM$Sample_location,
+                        permutations = 9999,
+                        method = "bray")
+PERMANOVA_DM
+
+# NOTE: 9999 and 999 permutationss have similar results 
+```
+
+```{r, echpo = FALSE}
+# PERMANOVA RESULTS
+# W/ SAMPLE LOCATION
+PERMANOVA_DM
+```
+
+# PAIRWISE COMPARISONS BETWEEN GROUPS
+## PERMANOVA PAIRWISE
+```{r, include = FALSE, echo = FALSE}
+# ECOLE PACKAGE
+library(ecole)
+PAIR_PREDATOR <- permanova_pairwise(x = DIET_DIST_DM, 
+                                    grp = DIET_PREDICT$SEASON_PREDATOR, 
+                                    permutations = 9999,
+                                    method = 'bray', 
+                                    adj = 'bonferroni')
+
+######## SEASONS -- WITHIN PREDATOR GORUP CONTRASTS ######## 
+PAIR_PREDATOR_SEASON <- PAIR_PREDATOR %>%
+  filter(##### BNT ##### 
+         pairs == "MAY_2021_BNT vs AUG_2021_BNT" |
+         pairs == "MAY_2021_BNT vs OCT_2021_BNT" |
+         pairs == "AUG_2021_BNT vs OCT_2021_BNT" |
+         pairs == "MAY_2022_BNT vs AUG_2022_BNT" |
+         pairs == "MAY_2022_BNT vs OCT_2022_BNT" |
+         pairs == "AUG_2022_BNT vs OCT_2022_BNT" |
+         #####  MTS ##### 
+         pairs == "MAY_2021_MTS vs AUG_2021_MTS" |
+         pairs == "MAY_2021_MTS vs OCT_2021_MTS" |
+         pairs == "AUG_2021_MTS vs OCT_2021_MTS" | 
+         pairs == "MAY_2022_MTS vs AUG_2022_MTS" |
+         pairs == "MAY_2022_MTS vs OCT_2022_MTS" |
+         pairs == "AUG_2022_MTS vs OCT_2022_MTS")
+
+######## PREDATOR GROUPS -- BETWEEN PREDATOR GORUP CONTRASTS ######## 
+PAIR_PREDATOR_GROUPS <- PAIR_PREDATOR %>%
+  filter(##### 2021 ##### 
+         pairs == "MAY_2021_BNT vs MAY_2021_MTS" |
+         pairs == "AUG_2021_BNT vs AUG_2021_MTS" |
+         pairs == "OCT_2021_BNT vs OCT_2021_MTS" |
+         #### 2022  ##### 
+         pairs == "MAY_2022_BNT vs MAY_2022_MTS" |
+         pairs == "AUG_2022_MTS vs AUG_2022_BNT" |
+         pairs == "OCT_2022_MTS vs OCT_2022_BNT")
+
+# REMOVE
+rm(PAIR_PREDATOR_SEASON)
+```
+
+```{r, echo = FALSE}
+# PAIRWISE COMPARISONS
+PAIR_PREDATOR_GROUPS
+```
+
+# TEST FOR DIFFERENCES IN DISPERSION BETWEEN GROUPS
+## BETADISPER
+- Significant differences among groups (PERMANOVA or ANOSIM) may occur for either or both of two reasons (Warton et al. 2012): 1) Differences in the means (centroids) OR 2) Differences in the amount of dispersion of sample units around those centroids
+- TEST TO -- conclude that, although composition differs among predator groups & occasions, it does so because of differences in location rather than dispersion.
+```{r, include = FALSE, echo = FALSE}
+# BETA DISPERSION -- SIGNFICANT DIFFERNCES IN DISPERSION BETWEEN GROUPS
+perm.eg.betadisper <- betadisper(d = DIET_DIST_DM, group =  DIET_PREDICT$SEASON_PREDATOR,type = "centroid")
+anova(perm.eg.betadisper)
+
+# PARIWSIE DIFFERENCES IN DISPERSION
+PRED_DISPER <- TukeyHSD(perm.eg.betadisper)
+PRED_DISPER_DF <- PRED_DISPER$group %>% 
+  as.data.frame()
+  
+# BOXPLOT
+boxplot(perm.eg.betadisper)
+
+######## SEASONS -- WITHIN PREDATOR GORUP CONTRASTS ######## 
+PRED_DISPER_DF$Row_Name <- rownames(PRED_DISPER_DF)
+DIST_PREDATOR_SEASON <- PRED_DISPER_DF %>%
+  filter(##### BNT ##### 
+         Row_Name == "MAY_2021_BNT-AUG_2021_BNT" |
+         Row_Name == "OCT_2021_BNT-MAY_2021_BNT" |
+         Row_Name == "OCT_2021_BNT-AUG_2021_BNT" |
+         Row_Name == "MAY_2022_BNT-AUG_2022_BNT" |
+         Row_Name == "OCT_2022_BNT-MAY_2022_BNT" |
+         Row_Name == "OCT_2022_BNT-AUG_2022_BNT" |
+         ##### MTS ##### 
+         Row_Name == "MAY_2021_MTS-AUG_2021_MTS" |
+         Row_Name == "OCT_2021_MTS-MAY_2021_MTS" |
+         Row_Name == "OCT_2021_MTS-AUG_2021_MTS" | 
+         Row_Name == "MAY_2022_MTS-AUG_2022_MTS" |
+         Row_Name == "OCT_2022_MTS-MAY_2022_MTS" |
+         Row_Name == "OCT_2022_MTS-AUG_2022_MTS") 
+
+######## PREDATOR GROUPS -- BETWEEN PREDATOR GORUP CONTRASTS ######## 
+DIST_PREDATOR_GROUPS <- PRED_DISPER_DF %>%
+  filter(##### 2021 ##### 
+         Row_Name == "MAY_2021_MTS-MAY_2021_BNT" |
+         Row_Name == "AUG_2021_MTS-AUG_2021_BNT" |
+         Row_Name == "OCT_2021_MTS-OCT_2021_BNT" |
+         #### 2022  ##### 
+         Row_Name == "MAY_2022_MTS-MAY_2022_BNT" |
+         Row_Name == "AUG_2022_MTS-AUG_2022_BNT" |
+         Row_Name == "OCT_2022_MTS-OCT_2022_BNT")
+
+```
+
+```{r, echo = FALSE}
+# DISPERSION DIFFERENCES
+DIST_PREDATOR_GROUPS
+```
+
+# NMDS PLOT
+```{r, include = TRUE, message = FALSE, echo = FALSE}
+# RE LEVEL OCCASION & PREDATOR GROUPS
+# META_DIET_MDS_DM$Occasion <- ordered(META_DIET_MDS_DM$Occasion, levels = c("MAY_2021", "AUG_2021", "OCT_2021", "MAY_2022", "AUG_2022", "OCT_2022"))
+META_DIET_MDS_DM$season <- ordered(META_DIET_MDS_DM$season, levels = c("May", "August", "October"))
+META_DIET_MDS_DM$year <- ordered(META_DIET_MDS_DM$year, levels = c("2021", "2022"))
+
+# META_DIET_MDS_DM <- META_DIET_MDS_DM %>% filter(Group != "T2080521251")?
+
+# DEFINE MEAN CENTROID #
+CENTROID_MEAN <- META_DIET_MDS_DM %>%
+  group_by(year, season, Species) %>%
+  summarize(NMDS1 = mean(NMDS1), NMDS2 = mean(NMDS2))
+
+CENTROID_MEDIAN <- META_DIET_MDS_DM %>%
+  group_by(year, season, Species) %>%
+  summarize(NMDS1 = median(NMDS1), NMDS2 = median(NMDS2))
+
+##################### PLOTS ##################### 
+###### SPECIES w/ 95% ELLIPSES + MEAN/MEDIAN CENTROIDS ###### 
+META_DIET_MDS_DM %>%
+    ggplot(aes(x = NMDS1, y = NMDS2, color = Species)) +
+    stat_ellipse(level = 0.95) +
+    facet_grid(year~season)  +
+    geom_point(data = CENTROID_MEAN, size = 3, shape = 21, color = "black", aes(fill = Species)) +
+    geom_point(data = CENTROID_MEDIAN, size = 3, shape = 25, color = "black", aes(fill = Species)) +
+    theme_minimal()
+
+###### SPECIES W/ POINTS ###### 
+META_DIET_MDS_DM %>%
+    ggplot(aes(x = NMDS1, y = NMDS2, color = Species)) +
+    facet_grid(year~season)  +
+    theme_minimal() +
+    geom_point() 
+
+###### SPECIES w/ 95% ELLIPSES + 40% ELLIPSES + MEDIAN CENTROID ###### 
+NMDS_ELLIPSE <- META_DIET_MDS_DM %>%
+    ggplot(aes(x = NMDS1, y = NMDS2, color = Species)) +
+    stat_ellipse(level = 0.95, linetype = 2) +
+    stat_ellipse(level = 0.40) +
+    facet_grid(year~season)  +
+    theme_minimal() +
+    geom_point(data = CENTROID_MEDIAN, size = 3, shape = 21, color = "black", aes(fill = Species)) + 
+  labs(caption = str_wrap("Non-metric multidimensional scaling plots (NMDS) of brown trout and mottled sculpin diets. Dashed and solid ellipses show 95% and 40% confidence intervals, respectively. Points represent median centroids.")) +
+  theme(legend.position = "bottom",
+        legend.title = element_blank(),
+        plot.caption = element_text(hjust = 0))
+
+NMDS_POINTS <- META_DIET_MDS_DM %>%
+    ggplot(aes(x = NMDS1, y = NMDS2, color = Species)) +
+    geom_point(aes(shape=Species, color=Species), size=1) +
+    scale_shape_manual(values=c(1, 2))+
+    facet_grid(year~season)  +
+    theme_minimal() +
+    ggtitle("") +
+  stat_ellipse(level = 0.99, geom="polygon", alpha = 0.1, aes(fill = Species)) + 
+  labs(caption = str_wrap("Non-metric multidimensional scaling plots (NMDS) of brown trout and mottled sculpin diets. Ellipses show 95% confidence interval. For improved visualization, eight outlier points have been excluded.")) +
+  theme(legend.position = "bottom",
+        legend.title = element_blank(),
+        plot.caption = element_text(hjust = 0)) +
+  coord_cartesian(xlim = c(-0.025, 0.025), ylim = c(-0.015, 0.015))
+
+NMDS_SEASONS <- META_DIET_MDS_DM %>%
+    ggplot(aes(x = NMDS1, y = NMDS2, color = season)) +
+    geom_point(aes(shape=season, color=season), size=1) +
+    facet_grid(year~Species)  +
+    theme_minimal() +
+    ggtitle("") +
+  stat_ellipse(level = 0.99, geom="polygon", alpha = 0.1, aes(fill = season)) + 
+  labs(caption = str_wrap("Non-metric multidimensional scaling plots (NMDS) of brown trout and mottled sculpin diets. Ellipses show 95% confidence interval. For improved visualization, eight outlier points have been excluded.")) +
+  theme(legend.position = "bottom",
+        legend.title = element_blank(),
+        plot.caption = element_text(hjust = 0)) +
+  coord_cartesian(xlim = c(-0.025, 0.025), ylim = c(-0.015, 0.015))
+
+
+rm(CENTROID_MEAN, CENTROID_MEDIAN, NMDS_SEASONS)
+```
+
+```{r, fig.width=16, fig.height=9}
+META_DIET_MDS_DM2 <- META_DIET_MDS_DM %>%
+  mutate(SEASON = case_when(
+    season == "May" ~ "Spring",
+    season == "August" ~ "Summer", 
+    season == "October"  ~ "Autumn")) %>%
+  mutate(SEASON = factor(SEASON)) %>%
+  mutate(SEASON = fct_relevel(SEASON,c("Spring","Summer", "Autumn"))) %>%
+  mutate(YEAR = year) %>%
+  mutate(YEAR = factor(YEAR)) %>%
+  mutate(YEAR = fct_relevel(YEAR, c("2021","2022"))) %>%
+  mutate(SPECIES = case_when(
+    Species == "BNT" ~ "Brown trout",
+    Species == "MTS" ~ "Mottled sculpin"))
+
+META_DIET_MDS_DM2 %>%
+    ggplot(aes(x = NMDS1, y = NMDS2, color = SPECIES)) +
+    geom_point(aes(shape=SPECIES, color=SPECIES), size=3) +
+    scale_shape_manual(values=c(1, 2))+
+    facet_grid(YEAR~SEASON)  +
+    theme_minimal() +
+    ggtitle("") +
+  stat_ellipse(level = 0.95, geom="polygon", alpha = 0.1, aes(fill = SPECIES)) + 
+  theme(legend.position = "bottom",
+        legend.title = element_blank(),
+        plot.caption = element_text(hjust = 0)) +
+  coord_cartesian(xlim = c(-0.025, 0.025), ylim = c(-0.015, 0.015)) +
+  theme(
+        legend.title = element_blank(),
+        legend.position = "bottom",
+        legend.spacing.x = unit(0.8, 'cm'),
+        legend.text = element_text(size=16,  
+                                   color="black"),
+        strip.text = element_text(size=18,
+                                  color = 'black',
+                                  face = "bold"),
+         axis.title.x = element_text(size = 18,
+                                   color = "black",
+                                   face = "bold"),
+        axis.text.x = element_text(size = 16,
+                                   color = "black"),
+        axis.title.y = element_text(size = 18,
+                                   color = "black",
+                                   face = "bold"),
+        axis.text.y = element_text(size = 16,
+                                   color = "black"),
+        panel.grid.major = element_line(size = 0.2),
+        panel.grid.minor = element_line(size = 0.2),
+        panel.grid.major.x = element_blank()) + 
+    guides(fill = guide_legend(nrow = 1)) +
+  scale_color_manual(breaks = c("Brown trout", "Mottled sculpin"), 
+                     labels = c("Brown trout", "Mottled sculpin"),
+                     values=c("#ea5e00", "#bdbf01")) + 
+    scale_fill_manual(breaks = c("Brown trout", "Mottled sculpin"), 
+                     labels = c("Brown trout", "Mottled sculpin"),
+                     values=c("#ea5e00", "#bdbf01")) 
+
+# SAVE PLOT
+ggsave("NMDS.jpeg", width = 16, height = 9, units = "in")
+```
+
+
+
+```{r}
+NMDS_ELLIPSE
+NMDS_POINTS
+```
+
+# PREY CONTRIBUTING TO DIFFERENCES
+```{r, include = FALSE, echo = FALSE}
+# SIMPER -- cumsum = proportion of dissimilarity between groups explained by that prey group (average/meandist)
+(sim_dm <- with(DIET_PREDICT, simper(DIET_MATRIX, SEASON_PREDATOR, permutations = 9999)))
+summary(sim_dm)
+
+######## SEASONS -- WITHIN PREDATOR GORUP CONTRASTS ######## 
+## BNT
+MAY_AUG_BNT_2021 <- sim_dm$MAY_2021_BNT_AUG_2021_BNT %>%
+  as.data.frame()
+MAY_OCT_BNT_2021 <- sim_dm$MAY_2021_BNT_OCT_2021_BNT %>%
+  as.data.frame()
+AUG_OCT_BNT_2021 <- sim_dm$AUG_2021_BNT_OCT_2021_BNT %>%
+  as.data.frame()
+## MTS
+MAY_AUG_MTS_2021 <- sim_dm$MAY_2021_MTS_AUG_2021_MTS %>%
+  as.data.frame()
+MAY_OCT_MTS_2021 <- sim_dm$MAY_2021_MTS_OCT_2021_MTS %>%
+  as.data.frame()
+AUG_OCT_MTS_2021 <- sim_dm$AUG_2021_MTS_OCT_2021_MTS %>%
+  as.data.frame()
+
+######## PREDATOR GROUPS -- BETWEEN PREDATOR GORUP CONTRASTS ######## 
+## 2021
+MAY_2021_BNTvMTS <- sim_dm$MAY_2021_BNT_MAY_2021_MTS %>%
+  as.data.frame()
+AUG_2021_BNTvMTS <- sim_dm$AUG_2021_BNT_AUG_2021_MTS %>%
+  as.data.frame()
+OCT_2021_BNTvMTS <- sim_dm$OCT_2021_BNT_OCT_2021_MTS %>%
+  as.data.frame()
+
+## 2022
+MAY_2022_BNTvMTS <- sim_dm$MAY_2022_BNT_MAY_2022_MTS %>%
+  as.data.frame()
+AUG_2022_BNTvMTS <- sim_dm$AUG_2022_MTS_AUG_2022_BNT %>%
+  as.data.frame()
+OCT_2022_BNTvMTS <- sim_dm$OCT_2022_MTS_OCT_2022_BNT %>%
+  as.data.frame()
+```
+
+```{r, message = FALSE, echo = FALSE}
+# PREY CONTRIBUTIONS -- 2021
+MAY_2021_BNTvMTS
+AUG_2021_BNTvMTS
+OCT_2021_BNTvMTS
+```
+
+```{r, message = FALSE, echo = FALSE}
+# PREY CONTRIBUTIONS -- 2022
+MAY_2022_BNTvMTS
+AUG_2022_BNTvMTS
+OCT_2022_BNTvMTS
+```
+
+# DIET COMP PLOTS
+```{r, include=FALSE, echo = FALSE}
+############# INDIVUDAL AVERAGE PROPORTION #############
+# FORMAT DATA
+IND_COMP <- DIET %>%
+  filter(PREY_GROUP != "EMPTY") %>%
+  select(year, season, Sample_ID, Species, PREY_GROUP, Dry_mass) %>%
+  group_by(Sample_ID, PREY_GROUP) %>%
+  mutate(sum_prey_group = sum(Dry_mass)) %>%
+  distinct_at(vars(year, season, Sample_ID, PREY_GROUP), .keep_all = TRUE) %>%
+  group_by(Sample_ID) %>%
+  mutate(sum_total_prey = sum(sum_prey_group)) %>%
+  mutate(prop_prey = sum_prey_group/sum_total_prey) %>%
+  group_by(year, season, Species) %>%
+  mutate(distinct_ID = n_distinct(Sample_ID)) %>%
+  group_by(year, season, Species, PREY_GROUP) %>%
+  mutate(sum_prop = sum(prop_prey)) %>%
+  mutate(avg_prop = sum_prop/distinct_ID) %>%
+  distinct_at(vars(year, season, Species, PREY_GROUP), .keep_all = TRUE) %>%
+  select(year, season, Species, PREY_GROUP, avg_prop) %>%
+  mutate(round_avg_prop = round(avg_prop, digits = 3))
+
+# SPECIES MEANS
+IND_COMP_MEAN <- IND_COMP %>%
+  group_by(season, Species, PREY_GROUP) %>%
+  summarise(mean_prey = mean(round_avg_prop))
+
+# RELEVEL
+IND_COMP$season <- ordered(IND_COMP$season, levels = c("May", "August", "October"))
+IND_COMP$year <- ordered(IND_COMP$year, levels = c("2021", "2022"))
+
+# PLOT
+IND_COMP_PLOT <- ggplot(IND_COMP, aes(x=Species, y=avg_prop, fill=PREY_GROUP)) +
+  geom_bar(stat="identity", aes(fill = PREY_GROUP)) +
+  facet_grid(year ~ season) +
+  theme_minimal() +
+  labs(fill='Prey Group:') +
+  labs(title = "Diet Composition of Brown Trout & Mottled Sculpin (Dry Mass of Prey)",
+              subtitle = "average proportion of a given prey group in an individual's diet") + 
+  ylab("Diet Composition") +
+  theme(legend.position="bottom") 
+```
+
+```{r}
+# DIET COMP PLOT
+IND_COMP_PLOT
+
+# WRITE CSV
+write.csv(IND_COMP, "\\DIET_COMP.csv", row.names=FALSE)
+
+```
+
+
