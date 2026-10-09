@@ -16,32 +16,42 @@ fish <- read.csv("Meta_Field_Data.csv")
 
 
 # First, we will start with cleaning up the diets data sheet
-library(tidyverse)
-
 meas_cols <- paste0("measurement_", 1:10)
 keys <- c("Sample_ID", "Order", "Family", "Life_stage", "BL.HW")
 
 diets <- original_diets %>%
   select(-Initials, -Date_entered, -IDer, -ID_date, -Occasion, -Diet_observation_number,
          -Measurement_mm, -Extra_counts, -Empty_case_mm, -PROOFED, -USE_SAMPLE, -Total_Sampled,
-         -NOTES) %>%
-  mutate(across(all_of(meas_cols), ~ as.numeric(as.character(.x))),
+         -NOTES) %>% # removing extra columns
+  mutate(`Life_stage` = if_else(Life_stage %in% c("l","L "), "L", Life_stage)) %>% # Convert lowercase "l" and "L " to capital "L" in Life Stage column
+  filter(`Life_stage` %in% c("A", "L", "P")) %>% # Only keep Life Stages that are A, L, or P, ignoring cases and other random letters
+  mutate(BL.HW = case_when(
+    BL.HW %in% c("Bl", "bl", "BL") ~ "BL",
+    BL.HW %in% c("hw", "Hw", "HW") ~ "HW",
+    TRUE ~ BL.HW
+  )) %>%
+  filter(BL.HW %in% c("BL", "HW")) %>%
+  mutate(across(all_of(meas_cols), ~ as.numeric(as.character(.x))), 
          Total.Measured = as.numeric(as.character(Total.Measured)),
-          Sample_ID = str_replace(Sample_ID, "^C0525(\\d{3})", "C20525\\1"))
+          Sample_ID = str_replace(Sample_ID, "^C0525(\\d{3})", "C20525\\1")) # cleaning up this sample ID error
+
+diets$Sample_date <- parse_date_time(as.character(diets$Sample_date), orders = c("mdy", "mdY")) %>% as.Date() # putting sample dates in chronological order
+diets$Sample_date <- factor(diets$Sample_date, levels = sort(unique(diets$Sample_date)))
 
 # 1. Pool the measurements from duplicate rows, keeping the first 10 in row order
 pooled <- diets %>%
   mutate(row_id = row_number()) %>%
   pivot_longer(all_of(meas_cols), names_to = "slot", values_to = "value",
                values_drop_na = TRUE) %>%
-  mutate(slot_n = as.integer(str_remove(slot, "measurement_"))) %>%
-  arrange(row_id, slot_n) %>%
-  group_by(across(all_of(keys))) %>%
+  mutate(slot_n = as.integer(str_remove(slot, "measurement_"))) %>% # what number measurement was it? 1, or 10?
+  arrange(row_id, slot_n) %>% 
+  group_by(across(all_of(keys))) %>% 
   mutate(new_slot = row_number()) %>%
   filter(new_slot <= 10) %>%          # measurements beyond 10 are dropped here
   ungroup() %>%
   select(all_of(keys), new_slot, value) %>%
-  pivot_wider(names_from = new_slot, values_from = value, names_prefix = "measurement_")
+  pivot_wider(names_from = new_slot, values_from = value, names_prefix = "measurement_") # removing temporary "slot" and "row" 
+# columns, but putting their values under measurements where they belong
 
 # make sure all 10 columns exist even if no group fills every slot
 pooled[setdiff(meas_cols, names(pooled))] <- NA_real_
@@ -57,22 +67,10 @@ diets <- diets %>%
   ) %>%
   left_join(pooled, by = keys)
 
-# 3. Your original steps
+# 3. Summing measurements into one column and renaming Abundance column
 diets <- diets %>%
   mutate(Measurement_mean_mm = rowMeans(select(., all_of(meas_cols)), na.rm = TRUE)) %>%
   select(-all_of(meas_cols)) %>%
-  rename(Abundance = Total.Measured)
-
-
-# put in chronological and site order
-# delete this after double checking whats happening above is correct
-diets <- diets %>%
-  select(-Initials, -Date_entered, -IDer, -ID_date, -Occasion, -Diet_observation_number,
-         -Measurement_mm,-Extra_counts, -Empty_case_mm, -PROOFED, -USE_SAMPLE, -Total_Sampled, -X,
-         -NOTES) %>% # With this move, we are disregarding empty cases, look deeper into this and maybe delete the whole row if this is a thing
-  mutate(across(measurement_1:measurement_10, ~ as.numeric(as.character(.x)))) %>%
-  mutate(Measurement_mean_mm= rowMeans(select(., measurement_1:measurement_10), na.rm = TRUE)) %>%
-  select(-(measurement_1:measurement_10)) %>%
   rename(Abundance = Total.Measured)
 
 
@@ -332,10 +330,15 @@ diets <- diets %>%
     TRUE ~ NA_character_
   ))
 
-# A little bit more cleaning up, REMOVE EMPTYS
+# A little bit more cleaning up
 diets <- diets %>%
-  select(-Order, -Family, - Density)
+  select(-Order, -Family, - Density, -Measurement_mean_mm) %>%
+  filter(Taxon != "Empty") %>%
+  arrange(Sample_date) %>%
+  mutate(Sample_date = factor(Sample_date, levels = sort(unique(Sample_date)))) %>%
+  relocate(Sample_ID, Sample_location, Sample_date, Life_stage, BL.HW, Taxon, Abundance, Biomass.Area.Corrected, FFG)
 
+str(diets)
 # First, we want to crunch this down to one fish with summed abundance, biomass, FFG metrics, diversity
 
 # Ultimately, we'd want to join this with fish and say if it has a diet it also has a column for diversity of diet, 
