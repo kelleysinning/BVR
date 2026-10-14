@@ -437,6 +437,19 @@ fish_with_diets <- fish %>% # making a df with all fish diet info
 
 plot(Weight~Fork_length , data = fish)
 
-# make df with all fish relative weight
-# make df with just fish diets and graphs of food 
+ggplot(fish_with_diets, aes(x = Species, y = Percent.Scraper.Abundance)) +
+       geom_col() 
+       # + facet_wrap(~Sampling_date)
 
+# Adding in relative weight (I should check these equations)
+fish <- fish %>%
+  mutate(Fork_length = as.numeric(Fork_length),
+         Weight      = as.numeric(Weight)) %>%
+  mutate(Ws = case_when(
+    Species == "BNT" ~ 10^(-4.867 + 2.960*log10(Fork_length)),
+    Species == "MTS" ~ 10^(-5.202 + 3.16*log10(Fork_length))
+  ),
+  Wr = Weight/Ws * 100)
+
+ggplot(fish, aes(x = Species, y = Wr)) +
+  geom_col() 
