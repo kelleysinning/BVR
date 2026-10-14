@@ -7,12 +7,14 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(tidyverse)
+install.packages("vegan")
+library(vegan)
+library(stringr)
 
 setwd("~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/Data Cleaning")
 
 original_diets <- read.csv("Diet_Data.csv")
 bugs <- read.csv("BMI_SurberData.csv")
-fish <- read.csv("Meta_Field_Data.csv")
 
 
 # First, we will start with cleaning up the diets data sheet
@@ -38,7 +40,7 @@ diets <- original_diets %>%
 diets$Sample_date <- parse_date_time(as.character(diets$Sample_date), orders = c("mdy", "mdY")) %>% as.Date() # putting sample dates in chronological order
 diets$Sample_date <- factor(diets$Sample_date, levels = sort(unique(diets$Sample_date)))
 
-# 1. Pool the measurements from duplicate rows, keeping the first 10 in row order
+    # 1. Pool the measurements from duplicate rows, keeping the first 10 in row order
 pooled <- diets %>%
   mutate(row_id = row_number()) %>%
   pivot_longer(all_of(meas_cols), names_to = "slot", values_to = "value",
@@ -53,11 +55,11 @@ pooled <- diets %>%
   pivot_wider(names_from = new_slot, values_from = value, names_prefix = "measurement_") # removing temporary "slot" and "row" 
 # columns, but putting their values under measurements where they belong
 
-# make sure all 10 columns exist even if no group fills every slot
+    # make sure all 10 columns exist even if no group fills every slot
 pooled[setdiff(meas_cols, names(pooled))] <- NA_real_
 pooled <- pooled %>% select(all_of(keys), all_of(meas_cols))
 
-# 2. Collapse duplicates to one row; counts are summed so extras still count toward abundance
+    # 2. Collapse duplicates to one row; counts are summed so extras still count toward abundance
 diets <- diets %>%
   group_by(across(all_of(keys))) %>%
   summarise(
@@ -67,16 +69,36 @@ diets <- diets %>%
   ) %>%
   left_join(pooled, by = keys)
 
-# 3. Summing measurements into one column and renaming Abundance column
+    # 3. Summing measurements into one column and renaming Abundance column
 diets <- diets %>%
   mutate(Measurement_mean_mm = rowMeans(select(., all_of(meas_cols)), na.rm = TRUE)) %>%
   select(-all_of(meas_cols)) %>%
   rename(Abundance = Total.Measured)
 
 
+# Now, fixing duplicate site IDs that occur because the sample location was entered incorrectly
+diets <- diets %>%
+  mutate(
+    Sample_ID = toupper(trimws(Sample_ID)),
+    Site_ID = str_extract(Sample_ID, "^(C1\\.5|C2|T1|T2|T3)")
+  )
+
+    # Check: any IDs that don't start with one of the five codes?
+diets %>% filter(is.na(Site_ID)) %>% distinct(Sample_ID)
+
+    # Check: how many rows disagree with the ID prefix?
+diets %>% filter(Sample_location != Site_ID) %>% distinct(Sample_ID, Sample_location, Site_ID)
+
+    # Keep only rows where the location matches the ID prefix
+diets <- diets %>%
+  mutate(Sample_location = Site_ID)
+
+# Confirm each Sample_ID now has exactly one location
+diets %>% distinct(Sample_ID, Sample_location) %>% count(Sample_ID) %>% filter(n > 1)
+
+
 
 # Renaming  typos
-
 diets <- diets %>%   
   mutate(Order = recode_values(Order,
                             c("Ephemeropterta", "Ephemerroptera", "Emphemeroptera", "Ehpemeroptera", "Ephemerillidae",
@@ -330,6 +352,15 @@ diets <- diets %>%
     TRUE ~ NA_character_
   ))
 
+# Looking at % FFG
+diets <- diets %>%
+  group_by(Sample_ID) %>%
+  mutate(Percent.Scraper.Abundance = 100 * sum(Abundance[FFG == "Scraper"], na.rm = TRUE)
+         / sum(Abundance, na.rm = TRUE),
+         Percent.Scraper.Biomass = 100 * sum(Biomass.Area.Corrected[FFG == "Scraper"], na.rm = TRUE)
+         / sum(Biomass.Area.Corrected, na.rm = TRUE)) %>%
+  ungroup()
+
 # A little bit more cleaning up
 diets <- diets %>%
   select(-Order, -Family, - Density, -Measurement_mean_mm) %>%
@@ -345,4 +376,67 @@ str(diets)
 # # of diet items, % scrapers
 
 # Next, summarize by sample occasions left join diets with fish ID codes to assign species
+
+# CALCULATING VEGAN INDICIES------------------------------------------------------
+
+community <- diets %>%
+  group_by(Sample_ID, Taxon) %>% # not grouping by BL or HW rn
+  summarise(Abundance = sum(Abundance, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = Taxon, values_from = Abundance, values_fill = 0) %>%
+  column_to_rownames("Sample_ID")
+
+str(community)
+# Richness (number of different taxa)
+S <- specnumber(community)
+
+# Shannon, Simpson, inverse Simpson
+H     <- diversity(community, index = "shannon") # Higher values mean greater diversity, sensitive to rare species
+simp  <- diversity(community, index = "simpson") # A higher value means lower diversity (higher dominance by one or a few species).
+invS  <- diversity(community, index = "invsimpson") # Higher values mean greater diversity. It represents the "effective number of species"—the number of equally-abundant species that would give the same community diversity
+
+# Evenness (Pielou's J)
+J <- H / log(S) # how similar is the number of different species, or balance
+
+
+
+div_table <- data.frame(
+  Sample_ID = rownames(community),
+  richness = S, shannon = H, simpson = simp,
+  invsimpson = invS, evenness = J
+)
+
+# FINALIZING THE DIET TABLE-----------------------------------------------------
+
+diets_final <- diets %>%
+  group_by(Sample_ID, Sample_location) %>%
+  summarise(
+    Total.Biomass = sum(Biomass.Area.Corrected),
+    Total.Abundance = sum(Abundance),
+    Percent.Scraper.Abundance = mean(Percent.Scraper.Abundance),
+    Percent.Scraper.Biomass = mean(Percent.Scraper.Biomass),
+    .groups = "drop"
+  ) %>%
+  left_join(div_table, by = "Sample_ID")
+
+  
+# LINKING WITH FISH DATA--------------------------------------------------------
+fish <- read.csv("Meta_Field_Data.csv")
+
+fish <- fish %>%
+  select(-Initials, -Date_entered, -Observation_number, -Occasion, -Recorder, -Pass,
+         -Fin_clip, -Scales, -Handling_mortality, -Comments, -Recap, -PIT_ID, -Handler,
+         -Proofed_by_initials, -Proofed_date, -Corrected_by_initials, -Corrected_date) %>%
+  rename(Sample_ID = Individual_ID)
+
+fish <- fish %>%
+  left_join(diets_final, by = "Sample_ID") %>%
+  select(-Sample_location)
+
+fish_with_diets <- fish %>% # making a df with all fish diet info
+  filter(Diet == "Y", !is.na(Total.Abundance))
+
+plot(Weight~Fork_length , data = fish)
+
+# make df with all fish relative weight
+# make df with just fish diets and graphs of food 
 
