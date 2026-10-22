@@ -438,7 +438,7 @@ fish_with_diets <- fish %>% # making a df with all fish diet info
 plot(Weight~Fork_length , data = fish)
 
 ggplot(fish_with_diets, aes(x = Species, y = Percent.Scraper.Abundance)) +
-       geom_col() 
+       geom_boxplot() 
        # + facet_wrap(~Sampling_date)
 
 # Adding in relative weight (I should check these equations)
@@ -451,5 +451,86 @@ fish <- fish %>%
   ),
   Wr = Weight/Ws * 100)
 
-ggplot(fish, aes(x = Species, y = Wr)) +
-  geom_col() 
+
+
+fish_with_diets <- fish_with_diets %>%
+  mutate(Fork_length = as.numeric(Fork_length),
+         Weight      = as.numeric(Weight)) %>%
+  mutate(Ws = case_when(
+    Species == "BNT" ~ 10^(-4.867 + 2.960*log10(Fork_length)),
+    Species == "MTS" ~ 10^(-5.202 + 3.16*log10(Fork_length))
+  ),
+  Wr = Weight/Ws * 100)
+
+
+# Left join with flow
+
+# RETRIEVING USGS GAUGE DATA
+install.packages("dataRetrieval", type = "source")
+library(dataRetrieval)
+packageVersion("dataRetrieval")  # should be >= 2.7.19
+
+
+# https://doi-usgs.github.io/dataRetrieval/reference/read_waterdata_daily.html
+# read_waterdata_daily is newer 
+site <- "USGS-09057500"  # USGS site number (Blue River below Green Mountain)
+parameter_code <- "00060"    # Parameter code for discharge (ft³/s)
+statistic_id <- "00003"      # Statistic code for daily mean
+start_date <- "2021-04-01" # Date before first sampling event ever
+end_date <- "2026-10-10" # Recent data
+
+# Retrieve daily discharge data
+discharge_data <- read_waterdata_daily(
+  monitoring_location_id = site,
+  parameter_code = parameter_code,
+  statistic_id = statistic_id,
+  time = c(start_date, end_date),
+  skipGeometry = TRUE,
+)
+
+discharge_data <- discharge_data %>%
+  select(time, value)
+
+discharge_data <- discharge_data %>%
+  rename(Discharge_cfs = value,
+         Sampling_date = time
+  )
+
+discharge_data <- as.data.frame(discharge_data)
+str(fish)
+
+fish <- fish %>%
+  mutate(Sampling_date = mdy(Sampling_date))%>%
+  left_join(discharge_data, by = "Sampling_date") 
+
+fish_with_diets <- fish_with_diets %>%
+  mutate(Sampling_date = mdy(Sampling_date))%>%
+  left_join(discharge_data, by = "Sampling_date") 
+
+
+
+
+
+# Okay, now I want to add in surber community------------------------------------
+
+diets <- original_diets %>%
+  select(-Initials, -Date_entered, -IDer, -ID_date, -Occasion, -Diet_observation_number,
+         -Measurement_mm, -Extra_counts, -Empty_case_mm, -PROOFED, -USE_SAMPLE, -Total_Sampled,
+         -NOTES) %>% # removing extra columns
+  mutate(`Life_stage` = if_else(Life_stage %in% c("l","L "), "L", Life_stage)) %>% # Convert lowercase "l" and "L " to capital "L" in Life Stage column
+  filter(`Life_stage` %in% c("A", "L", "P")) %>% # Only keep Life Stages that are A, L, or P, ignoring cases and other random letters
+  mutate(BL.HW = case_when(
+    BL.HW %in% c("Bl", "bl", "BL") ~ "BL",
+    BL.HW %in% c("hw", "Hw", "HW") ~ "HW",
+    TRUE ~ BL.HW
+  )) %>%
+  filter(BL.HW %in% c("BL", "HW")) %>%
+  mutate(across(all_of(meas_cols), ~ as.numeric(as.character(.x))), 
+         Total.Measured = as.numeric(as.character(Total.Measured)),
+         Sample_ID = str_replace(Sample_ID, "^C0525(\\d{3})", "C20525\\1")) # cleaning up this sample ID error
+
+diets$Sample_date <- parse_date_time(as.character(diets$Sample_date), orders = c("mdy", "mdY")) %>% as.Date() # putting sample dates in chronological order
+diets$Sample_date <- factor(diets$Sample_date, levels = sort(unique(diets$Sample_date)))
+
+
+
