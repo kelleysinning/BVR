@@ -446,7 +446,7 @@ fish <- fish %>%
   mutate(Fork_length = as.numeric(Fork_length),
          Weight      = as.numeric(Weight)) %>%
   mutate(Ws = case_when(
-    Species == "BNT" ~ 10^(-4.867 + 2.960*log10(Fork_length)),
+    Species == "BNT" ~ 10^(-4.867 + 2.960*log10(Fork_length)), # Milewksi and Brown et al, 1994 but doesn't apply to small fish, min 120 cm, can fit a linear model for our own pooled data, take log10 of. each length and weight, each fish above and below are different
     Species == "MTS" ~ 10^(-5.202 + 3.16*log10(Fork_length))
   ),
   Wr = Weight/Ws * 100)
