@@ -50,8 +50,8 @@ ClimWin_demonstration.R: Same as above but in R script
 
 SI_climwin.R: Sliding Window analysis for niche overlap and discharge--> revisit this sometime
 
-SI_discharge.csv: discharge begining in Jan 2020-Dec 2024, to give plenty of window before the first SI sampling event, created
-at bottom of SI_Fish_21-24.R
+SI_discharge.csv: discharge beginning in Jan 2020-Dec 2024, to give plenty of window before the first SI sampling event, created
+at bottom of SI_Fish_21-24.R. 
 
 didymo_over_time.csv: all diatom data from 1/2023-Present, doesn't include velocity data, used in ClimWin
 
@@ -61,10 +61,10 @@ collected in Jan. 2023, used in CLimWin
 
 # DATA CLEANING
 
-Data Wrangling.R: where I will clean up thes messy big data sheets!
+Data Wrangling.R: where I will clean up these messy big data sheets!
 
 BMI_SurberData.csv: surber data beginning in 2024-present
 
-Diet_Data.csv: Fish guy analysis beginning in May 2021 with the start of the project
+Diet_Data.csv: Fish gut analysis beginning in May 2021 with the start of the project
 
 Meta_Field_Data.csv: All fish length, weight, IDs, species from all sampling occasions

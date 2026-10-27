@@ -512,25 +512,66 @@ fish_with_diets <- fish_with_diets %>%
 
 
 # Okay, now I want to add in surber community------------------------------------
+library(dplyr)
 
-diets <- original_diets %>%
-  select(-Initials, -Date_entered, -IDer, -ID_date, -Occasion, -Diet_observation_number,
-         -Measurement_mm, -Extra_counts, -Empty_case_mm, -PROOFED, -USE_SAMPLE, -Total_Sampled,
-         -NOTES) %>% # removing extra columns
-  mutate(`Life_stage` = if_else(Life_stage %in% c("l","L "), "L", Life_stage)) %>% # Convert lowercase "l" and "L " to capital "L" in Life Stage column
-  filter(`Life_stage` %in% c("A", "L", "P")) %>% # Only keep Life Stages that are A, L, or P, ignoring cases and other random letters
-  mutate(BL.HW = case_when(
-    BL.HW %in% c("Bl", "bl", "BL") ~ "BL",
-    BL.HW %in% c("hw", "Hw", "HW") ~ "HW",
-    TRUE ~ BL.HW
+original_bugs<- bugs
+
+
+meas_cols <- paste0("measurement_", 1:10)
+
+bugs <- bugs %>%
+  dplyr::select(-initials, -date_entered, -sorter_ID, -occasion_ID, -collection_date, -sorting_date,
+         -grids_sampled, -empty_case, -NOTES, -X, -PROOFED.BY, -PROOF.DATE) %>% # removing extra columns
+  filter(!grepl("Eagle River|CR|ER", Site, ignore.case = TRUE)) %>%
+  mutate(life_stage = case_when(
+    life_stage %in% c("L ", "L?") ~ "L",
+    life_stage %in% c("P?") ~ "P",
+    life_stage %in% c("A?") ~ "A",
+    TRUE ~ life_stage)) %>%
+  filter(`life_stage` %in% c("A", "L", "P")) %>% # Only keep Life Stages that are A, L, or P, ignoring random spaces
+  mutate(BL_HW = case_when(
+    BL_HW %in% c("Bl", "BW") ~ "BL",
+    TRUE ~ BL_HW
   )) %>%
-  filter(BL.HW %in% c("BL", "HW")) %>%
-  mutate(across(all_of(meas_cols), ~ as.numeric(as.character(.x))), 
-         Total.Measured = as.numeric(as.character(Total.Measured)),
-         Sample_ID = str_replace(Sample_ID, "^C0525(\\d{3})", "C20525\\1")) # cleaning up this sample ID error
+  filter(BL_HW %in% c("BL", "HW")) # ignoring ""
 
-diets$Sample_date <- parse_date_time(as.character(diets$Sample_date), orders = c("mdy", "mdY")) %>% as.Date() # putting sample dates in chronological order
-diets$Sample_date <- factor(diets$Sample_date, levels = sort(unique(diets$Sample_date)))
+# also want to filter out eagle and colorado river
+unique(bugs$sample_location)
 
+bugs$Sample_date <- parse_date_time(as.character(bugs$Sample_date), orders = c("mdy", "mdY")) %>% as.Date() # putting sample dates in chronological order
+bugs$Sample_date <- factor(bugs$Sample_date, levels = sort(unique(bugs$Sample_date)))
 
+# 1. Pool the measurements from duplicate rows, keeping the first 10 in row order
+pooled <- bugs %>%
+  mutate(row_id = row_number()) %>%
+  pivot_longer(all_of(meas_cols), names_to = "slot", values_to = "value",
+               values_drop_na = TRUE) %>%
+  mutate(slot_n = as.integer(str_remove(slot, "measurement_"))) %>% # what number measurement was it? 1, or 10?
+  arrange(row_id, slot_n) %>% 
+  group_by(across(all_of(keys))) %>% 
+  mutate(new_slot = row_number()) %>%
+  filter(new_slot <= 10) %>%          # measurements beyond 10 are dropped here
+  ungroup() %>%
+  select(all_of(keys), new_slot, value) %>%
+  pivot_wider(names_from = new_slot, values_from = value, names_prefix = "measurement_") # removing temporary "slot" and "row" 
+# columns, but putting their values under measurements where they belong
 
+# make sure all 10 columns exist even if no group fills every slot
+pooled[setdiff(meas_cols, names(pooled))] <- NA_real_
+pooled <- pooled %>% select(all_of(keys), all_of(meas_cols))
+
+# 2. Collapse duplicates to one row; counts are summed so extras still count toward abundance
+bugs <- bugs %>%
+  group_by(across(all_of(keys))) %>%
+  summarise(
+    across(-c(all_of(meas_cols), Total.Measured), first),
+    Total.Measured = sum(Total.Measured, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  left_join(pooled, by = keys)
+
+# 3. Summing measurements into one column and renaming Abundance column
+bugs <- bugs %>%
+  mutate(Measurement_mean_mm = rowMeans(select(., all_of(meas_cols)), na.rm = TRUE)) %>%
+  select(-all_of(meas_cols)) %>%
+  rename(Abundance = Total.Measured)

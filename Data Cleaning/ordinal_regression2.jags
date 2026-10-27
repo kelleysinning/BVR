@@ -1,0 +1,47 @@
+
+  model {
+
+   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   # cut-points
+   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   for (j in 1:K){
+     for (k in 1:C){
+       theta.star[j,k] ~ dnorm(0, 0.01)
+     }
+     theta[j,1:C] <- sort(theta.star[j,])
+   }
+   
+   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   # ordered logit model for survey responses
+   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   beta[1] = -1
+   beta[2] ~ dnorm(0, 0.01)
+   beta[3] ~ dnorm(0, 0.01)
+   sigma[1] ~ dgamma(1,1)
+   tau[1] = pow(sigma[1], -2)
+   for (i in 1:n){
+     eta[i] ~ dnorm(0, tau[1])
+     
+     for (j in 1:K){
+       mu[i,j] <- beta[j] * eta[i]
+       S[i,j] ~ dordered.logit(mu[i,j], theta[j,])
+     }
+
+   } 
+
+   alpha[1] ~ dnorm(0, 1)
+   alpha[2] ~ dnorm(0, 1) T(0,)
+   alpha[3] ~ dnorm(0, 1)
+   sigma[2] ~ dgamma(1,1)
+   tau[2] = pow(sigma[2], -2)
+   psi ~ dnorm(1, 1)
+   for (i in 1:n){
+     x[i] ~ dnorm(psi * eta[i], tau[2])
+     log(lambda[i]) = alpha[1] + alpha[2] * eta[i] + alpha[3] * x[i]
+     y[i] ~ dpois(lambda[i])
+   }
+
+
+      
+  }
+  
