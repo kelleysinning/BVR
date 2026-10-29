@@ -14,8 +14,6 @@ library(stringr)
 setwd("~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/Data Cleaning")
 
 original_diets <- read.csv("Diet_Data.csv")
-bugs <- read.csv("BMI_SurberData.csv")
-
 
 # First, we will start with cleaning up the diets data sheet
 meas_cols <- paste0("measurement_", 1:10)
@@ -116,8 +114,8 @@ diets <- diets %>%
                             c("isopoda", "Isopoda") ~ "Asellidae",
                             c("insecta") ~ "Insecta",
                             c("Coleoptera ") ~ "Coleoptera",
-                            c("Aquatic mite", "Hydrachidae") ~ "Hydrachnidae",
-                            c("Trombiditonnes", "Trombidiformes", "Ant") ~ "Formicidae",
+                            c("Aquatic mite", "Hydrachidae", "Trombiditonnes", "Trombidiformes") ~ "Hydrachnidae",
+                            c("Ant") ~ "Formicidae",
                             c("Hirudinea") ~ "Leech",
                             c("gastropoda") ~ "Gastropoda",
                             c("Polychaeta") ~ "Oligochaeta",
@@ -513,6 +511,7 @@ fish_with_diets <- fish_with_diets %>%
 
 # Okay, now I want to add in surber community------------------------------------
 library(dplyr)
+bugs <- read.csv("BMI_SurberData.csv")
 
 original_bugs<- bugs
 
@@ -520,7 +519,7 @@ original_bugs<- bugs
 meas_cols <- paste0("measurement_", 1:10)
 
 bugs <- bugs %>%
-  dplyr::select(-initials, -date_entered, -sorter_ID, -occasion_ID, -collection_date, -sorting_date,
+  dplyr::select(-initials, -date_entered, -sorter_ID, -occasion_ID, -sorting_date,
          -grids_sampled, -empty_case, -NOTES, -X, -PROOFED.BY, -PROOF.DATE) %>% # removing extra columns
   filter(!grepl("Eagle River|CR|ER", Site, ignore.case = TRUE)) %>%
   mutate(life_stage = case_when(
@@ -533,15 +532,19 @@ bugs <- bugs %>%
     BL_HW %in% c("Bl", "BW") ~ "BL",
     TRUE ~ BL_HW
   )) %>%
-  filter(BL_HW %in% c("BL", "HW")) # ignoring ""
+  filter(BL_HW %in% c("BL", "HW")) %>% # ignoring ""
+  mutate(across(all_of(meas_cols), ~ as.numeric(as.character(.x))),
+         Total.Measured = as.numeric(as.character(Total.Measured)))
+         
+str(bugs)
 
-# also want to filter out eagle and colorado river
-unique(bugs$sample_location)
-
+unique(bugs$Sample_date)
 bugs$Sample_date <- parse_date_time(as.character(bugs$Sample_date), orders = c("mdy", "mdY")) %>% as.Date() # putting sample dates in chronological order
 bugs$Sample_date <- factor(bugs$Sample_date, levels = sort(unique(bugs$Sample_date)))
 
 # 1. Pool the measurements from duplicate rows, keeping the first 10 in row order
+keys <- c("sample_ID", "Order", "Family", "life_stage", "BL_HW")
+
 pooled <- bugs %>%
   mutate(row_id = row_number()) %>%
   pivot_longer(all_of(meas_cols), names_to = "slot", values_to = "value",
@@ -552,13 +555,13 @@ pooled <- bugs %>%
   mutate(new_slot = row_number()) %>%
   filter(new_slot <= 10) %>%          # measurements beyond 10 are dropped here
   ungroup() %>%
-  select(all_of(keys), new_slot, value) %>%
+  dplyr::select(all_of(keys), new_slot, value) %>%
   pivot_wider(names_from = new_slot, values_from = value, names_prefix = "measurement_") # removing temporary "slot" and "row" 
 # columns, but putting their values under measurements where they belong
 
 # make sure all 10 columns exist even if no group fills every slot
 pooled[setdiff(meas_cols, names(pooled))] <- NA_real_
-pooled <- pooled %>% select(all_of(keys), all_of(meas_cols))
+pooled <- pooled %>% dplyr::select(all_of(keys), all_of(meas_cols))
 
 # 2. Collapse duplicates to one row; counts are summed so extras still count toward abundance
 bugs <- bugs %>%
@@ -572,6 +575,50 @@ bugs <- bugs %>%
 
 # 3. Summing measurements into one column and renaming Abundance column
 bugs <- bugs %>%
-  mutate(Measurement_mean_mm = rowMeans(select(., all_of(meas_cols)), na.rm = TRUE)) %>%
-  select(-all_of(meas_cols)) %>%
+  mutate(Measurement_mean_mm = rowMeans(dplyr::select(., all_of(meas_cols)), na.rm = TRUE)) %>%
+  dplyr::select(-all_of(meas_cols)) %>%
   rename(Abundance = Total.Measured)
+
+
+# Renaming  typos
+bugs <- bugs %>%    
+  mutate(Order = recode_values(Order,
+                               c("Amphipoda  ", "\"Scud\"") ~ "Amphipoda",
+                               c("Diptera ", "Chironomidae") ~ "Diptera",
+                               c("\"Worm\"", "\"Aquatic worm?\"", "Oligochaeta ") ~ "Oligochaeta",
+                               c("Elmidae") ~ "Coleoptera",
+                               c("Collembola ") ~ "Collembola",
+                               c("Ephemerellidae") ~ "Ephemeroptera",
+                               c("Gastropoda ") ~ "Gastropoda",
+                               c("Trichoptera ") ~ "Trichoptera",
+                               c("Tricladida ", "Tricladida", "Planaria") ~ "Planarian",
+                               c("Trombidiformes", "Trombidiformes ") ~ "Hydrachnidae",
+                               c("Terrestrial ") ~ "Terrestrial",
+                               c("Podocopida") ~ "Ostracoda",
+                               default = Order))  %>%    
+  filter(!Order %in% c("n/a", ""))
+unique(bugs$Order)
+
+bugs <- bugs %>%    
+  mutate(Family = recode_values(Family,
+                               c("Brachcentridae") ~ "Brachycentridae",
+                               c("Chloroperidae") ~ "Chloroperlidae",
+                               c("Crangonyctidae ") ~ "Crangonyctidae",
+                               c("Dytiscidae?", "Dytiscidae ") ~ "Dytiscidae",
+                               c("elmidae", "Elmidae ") ~ "Elmidae",
+                               c("Formidae") ~ "Formicidae",
+                               c("Glossomatidae", "Glossosomatidae ", " Glossosomatidae") ~ "Glossosomatidae",
+                               c("Hydrachnidae ") ~ "Hydrachnidae",
+                               c("Hydroptilidae ") ~ "Hydroptilidae",
+                               c("Hyrdrophilidae? ") ~ "Hydrophilidae",
+                               c("Leptopblebidae", "Leptophlebidae") ~ "Leptophlebiidae",
+                               c("Ostracod") ~ "Ostracoda",
+                               c("Phoridae?") ~ "Phoridae",
+                               c("Planariidae ", "Planariidae") ~ "Planarian",
+                               c("Springtails") ~ "Collembola",
+                               c("terrestrial") ~ "Terrestrial",
+                               c("Worms", "worms") ~ "Oligochaeta",
+                               default = Family))%>%    
+  filter(!Family %in% c("1", "n/a", "", "rare", "Lepidostomatidae MT"))
+unique(bugs$Family)
+
