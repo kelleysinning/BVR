@@ -858,8 +858,10 @@ div_table <- data.frame(
 
 # FINALIZING THE DIET TABLE-----------------------------------------------------
 
+# Summarizing per surber (summing total biomass and abundance, taking mean of percent scraper metrics
+# because they are the same across the site, so just averaging to get it in one row)
 bugs_final <- bugs %>%
-  group_by(sample_ID, Site) %>%
+  group_by(sample_ID, Site, Sample_date) %>%
   summarise(
     Total.Biomass = sum(Biomass.Area.Corrected, na.rm = TRUE),
     Total.Abundance = sum(Abundance),
@@ -868,17 +870,39 @@ bugs_final <- bugs %>%
     .groups = "drop"
   ) %>%
   left_join(div_table, by = "sample_ID") %>%
-  rename(Sample_ID = sample_ID)
+  rename(Sample_ID = sample_ID, Sampling_date = Sample_date) %>%
+  mutate(Sampling_date = as.Date(as.character(Sampling_date))) # Sample date was a level
 
-
+# Now, summarizing per occassion (i.e., averaging the surbers)
+bugs_final_summary <- bugs_final %>%
+  group_by(Site, Sampling_date) %>%
+  summarise(
+  Total.Biomass = mean(Total.Biomass),
+  Total.Abundance = mean(Total.Abundance),
+  Percent.Scraper.Abundance = mean(Percent.Scraper.Abundance),
+  Percent.Scraper.Biomass = mean(Percent.Scraper.Biomass),
+  .groups = "drop")
 
 ###############################################################################
 # MEGA COMBINE WHHHOOOOO   ####################################################
 ###############################################################################
+fish <- fish %>%
+  rename(Site = Location)
+
+fish_with_diets <- fish_with_diets %>%
+  rename(Site = Location)
+
 
 bugs_and_fish <- fish %>%
-  left_join(bugs_final)
+  left_join(bugs_final_summary, by = c("Sampling_date", "Site"))
+
+bugs_and_fish_with_diets <- fish_with_diets %>%
+  left_join(bugs_final_summary, by = c("Sampling_date", "Site")) # This looks greatttt
+
+# next:
+# rename columns for above dfs now that they said the metrics for diets vs surbers
+# do length mass regressions on all raw data to get equation for BNT and MTS
 
 
-unique(fish$Sampling_date)
-unique(original_bugs$Sample_date)
+
+
