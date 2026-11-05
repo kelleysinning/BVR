@@ -502,16 +502,59 @@ discharge_data <- discharge_data %>%
 discharge_data <- as.data.frame(discharge_data)
 str(fish)
 
+
+# Other cleaning
+
+
 fish <- fish %>%
   mutate(Sampling_date = mdy(Sampling_date))%>%
   left_join(discharge_data, by = "Sampling_date") 
+
+fish <- fish %>%
+  rename(Site = Location)
+
+fish <- fish %>%
+mutate(Site_Sample_ID = paste0(Site, format(Sampling_date, "%m%y")))
+
+
 
 fish_with_diets <- fish_with_diets %>%
   mutate(Sampling_date = mdy(Sampling_date))%>%
   left_join(discharge_data, by = "Sampling_date") 
 
+fish_with_diets <- fish_with_diets %>%
+  rename(Site = Location)
+
+fish_with_diets <- fish_with_diets %>%
+  mutate(Site_Sample_ID = paste0(Site, format(Sampling_date, "%m%y")))
 
 
+# Final transformation---Summarizing per occasion 
+
+fish_with_diets_summary <- fish_with_diets %>%
+  group_by(Site_Sample_ID, Site, Species) %>%
+  summarise(
+    Mean.Fork.Length = mean(Fork_length, na.rm = TRUE),
+    Mean.Weight = mean(Weight, na.rm = TRUE),
+    Mean.Diet.Biomass = mean(Total.Biomass, na.rm = TRUE),
+    Mean.Diet.Abundance = mean(Total.Abundance, na.rm = TRUE),
+    Mean.Percent.Scraper.Abundance = mean(Percent.Scraper.Abundance, na.rm = TRUE),
+    Mean.Percent.Scraper.Biomass = mean(Percent.Scraper.Biomass,na.rm = TRUE),
+    Mean.Richness = mean(richness, na.rm = TRUE),
+    Mean.Shannon = mean(shannon, na.rm = TRUE),
+    Mean.Simpson = mean(simpson, na.rm = TRUE),
+    Mean.InvSimp = mean(invsimpson, na.rm = TRUE),
+    Mean.Evenness = mean(evenness, na.rm = TRUE),
+    Mean.Wr = mean(Wr, na.rm = TRUE),
+    Mean.Discharge = mean(Discharge_cfs),.groups = "drop")
+
+
+fish_with_diets_summary <- fish_with_diets_summary %>%
+  mutate(Site_Sample_ID = case_match(Site_Sample_ID,
+                           "T10724" ~ "T10824",
+                           "T30724"   ~ "T30724",
+                           "C1.50724"   ~ "C1.50824",
+                           .default = Site_Sample_ID))
 
 ################################################################################
 # ADDING IN SURBER COMMUNITY ##################################################
@@ -856,7 +899,7 @@ div_table <- data.frame(
 )
 
 
-# FINALIZING THE DIET TABLE-----------------------------------------------------
+# FINALIZING-----------------------------------------------------
 
 # Summarizing per surber (summing total biomass and abundance, taking mean of percent scraper metrics
 # because they are the same across the site, so just averaging to get it in one row)
@@ -874,30 +917,28 @@ bugs_final <- bugs %>%
   mutate(Sampling_date = as.Date(as.character(Sampling_date))) # Sample date was a level
 
 # Now, summarizing per occassion (i.e., averaging the surbers)
+
 bugs_final_summary <- bugs_final %>%
-  group_by(Site, Sampling_date) %>%
+  mutate(Site_Sample_ID = str_remove(Sample_ID, "_SURB[1-5]")) %>%
+  group_by(Site_Sample_ID, Site, Sampling_date) %>%
   summarise(
-  Total.Biomass = mean(Total.Biomass),
-  Total.Abundance = mean(Total.Abundance),
-  Percent.Scraper.Abundance = mean(Percent.Scraper.Abundance),
-  Percent.Scraper.Biomass = mean(Percent.Scraper.Biomass),
-  .groups = "drop")
+    Total.Biomass = mean(Total.Biomass),
+    Total.Abundance = mean(Total.Abundance),
+    Percent.Scraper.Abundance = mean(Percent.Scraper.Abundance),
+    Percent.Scraper.Biomass = mean(Percent.Scraper.Biomass),
+    .groups = "drop")
+
 
 ###############################################################################
 # MEGA COMBINE WHHHOOOOO   ####################################################
 ###############################################################################
-fish <- fish %>%
-  rename(Site = Location)
-
-fish_with_diets <- fish_with_diets %>%
-  rename(Site = Location)
 
 
 bugs_and_fish <- fish %>%
-  left_join(bugs_final_summary, by = c("Sampling_date", "Site"))
+  left_join(bugs_final_summary, by = c("Site_Sample_ID", "Site"))
 
-bugs_and_fish_with_diets <- fish_with_diets %>%
-  left_join(bugs_final_summary, by = c("Sampling_date", "Site")) # This looks greatttt
+bugs_and_fish_with_diets_Summary <- fish_with_diets_summary %>%
+  left_join(bugs_final_summary, by = c("Site_Sample_ID")) # This looks greatttt
 
 # next:
 # rename columns for above dfs now that they said the metrics for diets vs surbers
