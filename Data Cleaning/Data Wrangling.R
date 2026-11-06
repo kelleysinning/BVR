@@ -13,7 +13,7 @@ library(stringr)
 
 setwd("~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/Data Cleaning")
 
-original_diets <- read.csv("Diet_Data.csv")
+original_diets <- read.csv("Diet_Data_updated.csv")
 
 ################################################################################
 # CLEANING UP DIET DATA SHEET  #################################################
@@ -24,7 +24,7 @@ keys <- c("Sample_ID", "Order", "Family", "Life_stage", "BL.HW")
 
 diets <- original_diets %>%
   select(-Initials, -Date_entered, -IDer, -ID_date, -Occasion, -Diet_observation_number,
-         -Measurement_mm, -Extra_counts, -Empty_case_mm, -PROOFED, -USE_SAMPLE, -Total_Sampled,
+         -Measurement_mm, -Extra_counts, -Empty_case_mm, -PROOFED, -USE_SAMPLE,
          -NOTES) %>% # removing extra columns
   mutate(`Life_stage` = if_else(Life_stage %in% c("l","L "), "L", Life_stage)) %>% # Convert lowercase "l" and "L " to capital "L" in Life Stage column
   filter(`Life_stage` %in% c("A", "L", "P")) %>% # Only keep Life Stages that are A, L, or P, ignoring cases and other random letters
@@ -607,7 +607,7 @@ fish_with_diets_summary <- fish_with_diets %>%
 fish_with_diets_summary <- fish_with_diets_summary %>%
   mutate(Site_Sample_ID = case_match(Site_Sample_ID,
                            "T10724" ~ "T10824",
-                           "T30724"   ~ "T30724",
+                           "T30724"   ~ "T30824",
                            "C1.50724"   ~ "C1.50824",
                            .default = Site_Sample_ID))
 
@@ -994,6 +994,7 @@ bugs_and_fish <- fish %>%
 
 bugs_and_fish_with_diets_Summary <- fish_with_diets_summary %>%
   left_join(bugs_final_summary, by = c("Site_Sample_ID")) # This looks greatttt
+# T11023 missing
 
 # next:
 # rename columns for above dfs now that they said the metrics for diets vs surbers
