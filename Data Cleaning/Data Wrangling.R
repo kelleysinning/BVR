@@ -431,6 +431,62 @@ fish <- fish %>%
          -Proofed_by_initials, -Proofed_date, -Corrected_by_initials, -Corrected_date) %>%
   rename(Sample_ID = Individual_ID)
 
+
+# Before we left join, we have to fix some sample ID mismatches
+
+library(stringr)
+
+# Removing all extra periods except for C1.5
+clean_dots <- function(x) {
+  str_replace_all(trimws(x), "(?<!C1)\\.|\\.(?!5)", "")
+}
+
+fish$Sample_ID        <- clean_dots(fish$Sample_ID)
+diets_final$Sample_ID <- clean_dots(diets_final$Sample_ID)
+
+
+sites <- "^(C1\\.5|C2|T1|T2|T3)"
+
+# Check the lengths of what follows the site code
+rest <- str_remove(trimws(fish$Sample_ID), sites)
+table(nchar(rest))   # expect 7 (MMYYFFF) and 9 (MMDDYYFFF)
+
+standardize_id <- function(x) {
+  x    <- trimws(x)
+  site <- str_extract(x, sites)
+  rest <- str_remove(x, sites)
+  n    <- nchar(rest)
+  
+  ok <- n %in% c(7, 9, 11)
+  mm <- substr(rest, 1, 2)           # month
+  yy <- substr(rest, n - 4, n - 3)   # last 2 digits of year
+  ff <- substr(rest, n - 2, n)       # fish code
+  
+  ifelse(ok, paste0(site, mm, yy, ff), x)
+}
+
+fish$Sample_ID_clean        <- standardize_id(fish$Sample_ID)
+diets_final$Sample_ID_clean <- standardize_id(diets_final$Sample_ID)
+
+# Compare before and after
+fish[nchar(str_remove(fish$Sample_ID, sites)) == 9,
+     c("Sample_ID", "Sample_ID_clean")] |> head()
+
+anti_join(fish, diets_final, by = "Sample_ID_clean") # in fish but not diets
+anti_join(diets_final, fish, by = "Sample_ID_clean") # in diets but not fish
+
+
+# Renaming
+fish <- fish %>%
+  select(-Sample_ID) %>%
+  rename(Sample_ID = Sample_ID_clean)
+
+diets_final <- diets_final %>%
+  select(-Sample_ID) %>%
+  rename(Sample_ID = Sample_ID_clean)
+
+# Now, left join
+
 fish <- fish %>%
   left_join(diets_final, by = "Sample_ID") %>%
   select(-Sample_location)
@@ -504,7 +560,6 @@ str(fish)
 
 
 # Other cleaning
-
 
 fish <- fish %>%
   mutate(Sampling_date = mdy(Sampling_date))%>%
@@ -935,7 +990,7 @@ bugs_final_summary <- bugs_final %>%
 
 
 bugs_and_fish <- fish %>%
-  left_join(bugs_final_summary, by = c("Site_Sample_ID", "Site"))
+  left_join(bugs_final_summary, by = c("Site_Sample_ID"))
 
 bugs_and_fish_with_diets_Summary <- fish_with_diets_summary %>%
   left_join(bugs_final_summary, by = c("Site_Sample_ID")) # This looks greatttt
@@ -944,6 +999,40 @@ bugs_and_fish_with_diets_Summary <- fish_with_diets_summary %>%
 # rename columns for above dfs now that they said the metrics for diets vs surbers
 # do length mass regressions on all raw data to get equation for BNT and MTS
 
+anti_join(fish, bugs_final_summary, by = "Site_Sample_ID") # in fish but not surber
+anti_join(bugs_final_summary, fish, by = "Site_Sample_ID") # in diets but not fish
+
+
+library(dplyr)
+library(lme4)
+library(lmerTest)
+library(piecewiseSEM)
+
+# Prep: transform skewed biomass, scale predictors
+dat <- bugs_and_fish_with_diets_Summary %>%
+  mutate(
+    log_benthic = log(Mean.Percent.Scraper.Biomass + 0.001),   # adjust the constant to your smallest nonzero value
+    log_diet    = log(Percent.Scraper.Biomass + 0.001),
+    flow_z      = as.numeric(scale(Mean.Discharge)),
+    benthic_z   = as.numeric(scale(log_benthic)),
+    diet_z      = as.numeric(scale(log_diet)),
+    length_z    = as.numeric(scale(Mean.Fork.Length)),
+    na.rm = FALSE
+  )
+
+# Component models (one per endogenous variable)
+m_benthic <- lmer(benthic_z ~ flow_z + (1 | Site.x), data = dat)
+
+m_diet <- lmer(diet_z ~ benthic_z + flow_z + (1 | Site.x), data = dat)
+
+m_cond <- lmer(Mean.Wr ~ diet_z + benthic_z + flow_z + length_z + (1 | Site.x), data = dat)
+
+# Combine and fit
+sem_mod <- psem(m_benthic, m_diet, m_cond, data = dat)
+
+summary(sem_mod, conserve = TRUE)   # path coefficients, Fisher's C, R2
+coefs(sem_mod, standardize = "scale")
+dSep(sem_mod)                       # missing paths flagged by the d-separation tests
 
 
 
