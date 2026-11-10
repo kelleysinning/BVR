@@ -28,15 +28,37 @@ fish.condish <- data$Wr
 # produce cool figures, etc., but we're going to stick in BUGS-code land because lavaan
 # CAN'T handle: 1) link functions, 2) joint analysis with other (e.g., capture-mark-recapture)
 # data types, or 3) missing data.
-data <- data.frame(flow, food.qual, diet.qual, fish.condish,
-               'u ~ 1 + a1 * w   
-              v ~ 1 + b1 * u
-              flowxfish := a1*b1',   # this allows us to estimate the indirect effect of wolves on veg
+data <- data.frame(flow, food.qual, diet.qual, fish.condish)
+path1 <- sem(model =
+              'food.qual ~ 1 + a1 * flow  
+              diet.qual ~ 1 + b1 * food.qual
+              fish.condish ~ 1 + c1 * diet.qual
+              
+              foodxfish := b1 * c1
+              fishxflow := a1 * b1 * c1',   # this allows us to estimate the indirect effect of wolves on veg
              # also note we can specify parameter names!
              data = data)
+
+summary(path1)
+
 print(summary(path1))
 
+install.packages("semPlot")   # once
+library(semPlot)
 
+semPaths(path1,
+         what = "est",            # show estimated coefficients on arrows
+         whatLabels = "est",
+         layout = "tree2",        # left-to-right chain; try "tree", "spring", "circle"
+         rotation = 2,            # 2 = left to right (default 1 is top to bottom)
+         edge.label.cex = 1.1,
+         sizeMan = 10,            # box size
+         style = "lisrel",
+         intercepts = FALSE,      # hides the intercept triangles, which clutter the plot
+         residuals = FALSE,       # hides the residual loops
+         nCharNodes = 0,          # don't abbreviate variable names
+         color = list(man = c("lightblue", "lightgreen", "lightgreen", "plum")),
+         edge.color = "gray30")
 
 # Now, let's explore blavaan!
 # note you can specify the number of chains, burn-in, even priors, but the real
