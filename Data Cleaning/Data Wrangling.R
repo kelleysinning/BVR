@@ -472,8 +472,8 @@ diets_final$Sample_ID_clean <- standardize_id(diets_final$Sample_ID)
 fish[nchar(str_remove(fish$Sample_ID, sites)) == 9,
      c("Sample_ID", "Sample_ID_clean")] |> head()
 
-anti_join(fish, diets_final, by = "Sample_ID_clean") # in fish but not diets
-anti_join(diets_final, fish, by = "Sample_ID_clean") # in diets but not fish
+anti_join(fish, diets_final, by = "Sample_ID") # in fish but not diets
+b <- anti_join(diets_final, fish, by = "Sample_ID") # in diets but not fish
 
 
 # Renaming
@@ -584,9 +584,9 @@ fish_with_diets <- fish_with_diets %>%
   mutate(Site_Sample_ID = paste0(Site, format(Sampling_date, "%m%y")))
 
 
-# Final transformation---Summarizing per occasion 
+# Final transformation---Summarizing per occasion OR renaming columns that will eventually be merged
 
-fish_with_diets_summary <- fish_with_diets %>%
+fish_summary <- fish %>%
   group_by(Site_Sample_ID, Site, Species) %>%
   summarise(
     Mean.Fork.Length = mean(Fork_length, na.rm = TRUE),
@@ -601,7 +601,40 @@ fish_with_diets_summary <- fish_with_diets %>%
     Mean.InvSimp = mean(invsimpson, na.rm = TRUE),
     Mean.Evenness = mean(evenness, na.rm = TRUE),
     Mean.Wr = mean(Wr, na.rm = TRUE),
+    Mean.Discharge = mean(Discharge_cfs),.groups = "drop") 
+
+fish_summary <- fish_summary %>%
+  filter(Species %in% c("BNT", "MTS"))
+      
+
+
+fish_with_diets_summary <- fish_with_diets %>%
+  group_by(Site_Sample_ID, Site, Species) %>%
+  summarise(
+    Mean.Fork.Length = mean(Fork_length, na.rm = TRUE),
+    Mean.Weight = mean(Weight, na.rm = TRUE),
+    Mean.Diet.Biomass = mean(Total.Biomass, na.rm = TRUE),
+    Mean.Diet.Abundance = mean(Total.Abundance, na.rm = TRUE),
+    Mean.Diet.Percent.Scraper.Abundance = mean(Percent.Scraper.Abundance, na.rm = TRUE),
+    Mean.Diet.Percent.Scraper.Biomass = mean(Percent.Scraper.Biomass,na.rm = TRUE),
+    Mean.Diet.Richness = mean(richness, na.rm = TRUE),
+    Mean.Diet.Shannon = mean(shannon, na.rm = TRUE),
+    Mean.Diet.Simpson = mean(simpson, na.rm = TRUE),
+    Mean.Diet.InvSimp = mean(invsimpson, na.rm = TRUE),
+    Mean.Diet.Evenness = mean(evenness, na.rm = TRUE),
+    Mean.Wr = mean(Wr, na.rm = TRUE),
     Mean.Discharge = mean(Discharge_cfs),.groups = "drop")
+
+fish_with_diets <- fish_with_diets %>%
+rename(Total.Diet.Biomass = Total.Biomass,
+       Total.Diet.Abundance = Total.Abundance,
+       Percent.Diet.Scraper.Abundance = Percent.Scraper.Abundance,
+       Percent.Diet.Scraper.Biomass = Percent.Scraper.Biomass,
+       Diet.Richness = richness,
+       Diet.Shannon = shannon,
+       Diet.Simpson = simpson,
+       Diet.InvSimp = invsimpson,
+       Diet.Evenness = evenness)
 
 
 fish_with_diets_summary <- fish_with_diets_summary %>%
@@ -610,6 +643,13 @@ fish_with_diets_summary <- fish_with_diets_summary %>%
                            "T30724"   ~ "T30824",
                            "C1.50724"   ~ "C1.50824",
                            .default = Site_Sample_ID))
+
+fish_with_diets <- fish_with_diets %>%
+  mutate(Site_Sample_ID = case_match(Site_Sample_ID,
+                                     "T10724" ~ "T10824",
+                                     "T30724"   ~ "T30824",
+                                     "C1.50724"   ~ "C1.50824",
+                                     .default = Site_Sample_ID))
 
 ################################################################################
 # ADDING IN SURBER COMMUNITY ##################################################
@@ -988,52 +1028,29 @@ bugs_final_summary <- bugs_final %>%
 # MEGA COMBINE WHHHOOOOO   ####################################################
 ###############################################################################
 
-
-bugs_and_fish <- fish %>%
+# DFs with summarized (averaged) species per site
+bugs_and_fish <- fish_summary %>%
   left_join(bugs_final_summary, by = c("Site_Sample_ID"))
 
 bugs_and_fish_with_diets_Summary <- fish_with_diets_summary %>%
-  left_join(bugs_final_summary, by = c("Site_Sample_ID")) # This looks greatttt
-# T11023 missing
+  left_join(bugs_final_summary, by = c("Site_Sample_ID")) # T11023 missing
+
+bugs_and_fish <- na.omit(bugs_and_fish) # Removes all NAs, so any years without a surber taken were not included
+bugs_and_fish_with_diets_Summary <- na.omit(bugs_and_fish_with_diets_Summary) # Removes all NAs, so any years without a surber taken were not included
+
+# DFs with unsummarized (averaged) species per site, incase I want more data
+bugs_and_fish_with_diets_Unsummed <- fish_with_diets %>%
+  left_join(bugs_final_summary, by = c("Site_Sample_ID")) 
+
+bugs_and_fish_with_diets_Unsummed <- na.omit(bugs_and_fish_with_diets_Unsummed)
+
+# Saving as csv, also in SEM folder!!
+write.csv(bugs_and_fish_with_diets_Summary, "~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/Data Cleaning/bugs_and_fish_with_diets_Summary.csv", row.names = FALSE)
+write.csv(bugs_and_fish_with_diets_Summary, "~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/SEM/bugs_and_fish_with_diets_Summary.csv", row.names = FALSE)
+
+write.csv(bugs_and_fish_with_diets_Unsummed, "~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/Data Cleaning/bugs_and_fish_with_diets_Unsummed.csv", row.names = FALSE)
+write.csv(bugs_and_fish_with_diets_Unsummed, "~/Library/CloudStorage/OneDrive-TheUniversityofMontana/Data/BVR/SEM/bugs_and_fish_with_diets_Unsummed.csv", row.names = FALSE)
 
 # next:
-# rename columns for above dfs now that they said the metrics for diets vs surbers
+
 # do length mass regressions on all raw data to get equation for BNT and MTS
-
-anti_join(fish, bugs_final_summary, by = "Site_Sample_ID") # in fish but not surber
-anti_join(bugs_final_summary, fish, by = "Site_Sample_ID") # in diets but not fish
-
-
-library(dplyr)
-library(lme4)
-library(lmerTest)
-library(piecewiseSEM)
-
-# Prep: transform skewed biomass, scale predictors
-dat <- bugs_and_fish_with_diets_Summary %>%
-  mutate(
-    log_benthic = log(Mean.Percent.Scraper.Biomass + 0.001),   # adjust the constant to your smallest nonzero value
-    log_diet    = log(Percent.Scraper.Biomass + 0.001),
-    flow_z      = as.numeric(scale(Mean.Discharge)),
-    benthic_z   = as.numeric(scale(log_benthic)),
-    diet_z      = as.numeric(scale(log_diet)),
-    length_z    = as.numeric(scale(Mean.Fork.Length)),
-    na.rm = FALSE
-  )
-
-# Component models (one per endogenous variable)
-m_benthic <- lmer(benthic_z ~ flow_z + (1 | Site.x), data = dat)
-
-m_diet <- lmer(diet_z ~ benthic_z + flow_z + (1 | Site.x), data = dat)
-
-m_cond <- lmer(Mean.Wr ~ diet_z + benthic_z + flow_z + length_z + (1 | Site.x), data = dat)
-
-# Combine and fit
-sem_mod <- psem(m_benthic, m_diet, m_cond, data = dat)
-
-summary(sem_mod, conserve = TRUE)   # path coefficients, Fisher's C, R2
-coefs(sem_mod, standardize = "scale")
-dSep(sem_mod)                       # missing paths flagged by the d-separation tests
-
-
-

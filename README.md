@@ -42,6 +42,13 @@ discharge_data.csv: discharge data calculated from USGS gauges in Benthotorch-Ve
 
 OVERLAP.csv: niche overlap for MTS and BNT across sampling seasons and years from 2021-2024
 
+bugs_and_fish_with_diets_Summary.csv: The cleaning of all data sheets to ultimately have a df that includes fish, diet, surber, 
+and flow data for all fish that had diets that was then averaged across sites and species. Since surbers didn't begin until 2024, 
+it (and other NAs) was filtered out as to have no missing data for future analysis
+
+bugs_and_fish_with_diets_Unsummed.csv: The cleaning of all data sheets to ultimately have a df that includes fish, diet, surber, 
+and flow data for all fish that had diets that was NOT averaged across sites and species. Since surbers didn't begin until 2024, 
+it (and other NAs) was filtered out as to have no missing data for future analysis
 # CLIMWIN
 
 ClimWin Demonstration.Rmd: Sliding window demonstration for lab meeting with diatom and discharge, updated 8/25/2026
@@ -65,6 +72,14 @@ Data Wrangling.R: where I will clean up these messy big data sheets!
 
 BMI_SurberData.csv: surber data beginning in 2024-present
 
-Diet_Data.csv: Fish gut analysis beginning in May 2021 with the start of the project
+Diet_Data_updated.csv: Fish gut analysis beginning in May 2021 with the start of the project and some typos were cleaned during data cleaning process
 
 Meta_Field_Data.csv: All fish length, weight, IDs, species from all sampling occasions
+
+bugs_and_fish_with_diets_Summary.csv: The cleaning of all data sheets to ultimately have a df that includes fish, diet, surber, 
+and flow data for all fish that had diets that was then averaged across sites and species. Since surbers didn't begin until 2024, 
+it (and other NAs) was filtered out as to have no missing data for future analysis
+
+bugs_and_fish_with_diets_Unsummed.csv: The cleaning of all data sheets to ultimately have a df that includes fish, diet, surber, 
+and flow data for all fish that had diets that was NOT averaged across sites and species. Since surbers didn't begin until 2024, 
+it (and other NAs) was filtered out as to have no missing data for future analysis
