@@ -1,0 +1,41 @@
+model { 
+  for(i in 1:N) {
+    food.qual[i] ~ dnorm(mu[i,1], 1/psi[1,1,g[i]])
+    diet.qual[i] ~ dnorm(mu[i,2], 1/psi[2,2,g[i]])
+    fish.condish[i] ~ dnorm(mu[i,3], 1/psi[3,3,g[i]])
+
+  }
+
+  # mu definitions
+  for(i in 1:N) {
+    mu[i,1] <- alpha[1,1,g[i]] + beta[1,4,g[i]]*flow[i]
+    mu[i,2] <- alpha[2,1,g[i]] + beta[2,1,g[i]]*food.qual[i]
+    mu[i,3] <- alpha[3,1,g[i]] + beta[3,2,g[i]]*diet.qual[i]
+
+  }
+
+  # Assignments from parameter vector & equality constraints
+  alpha[1,1,1] <- parvec[1]
+  beta[1,4,1] <- parvec[2]
+  alpha[2,1,1] <- parvec[3]
+  beta[2,1,1] <- parvec[4]
+  alpha[3,1,1] <- parvec[5]
+  beta[3,2,1] <- parvec[6]
+  psi[1,1,1] <- pow(parvec[7],-1)
+  psi[2,2,1] <- pow(parvec[8],-1)
+  psi[3,3,1] <- pow(parvec[9],-1)
+  psi[4,4,1] <- 61713.0979378224
+  alpha[4,1,1] <- 332.78362745098
+  def[1,1,1] <- beta[2,1,1] * beta[3,2,1]
+  def[2,1,1] <- beta[1,4,1] * beta[2,1,1] * beta[3,2,1]
+  # Priors
+  parvec[1] ~ dnorm(0,1e-3)
+  parvec[2] ~ dnorm(0,1e-2)
+  parvec[3] ~ dnorm(0,1e-3)
+  parvec[4] ~ dnorm(0,1e-2)
+  parvec[5] ~ dnorm(0,1e-3)
+  parvec[6] ~ dnorm(0,1e-2)
+  parvec[7] ~ dgamma(1,.5)
+  parvec[8] ~ dgamma(1,.5)
+  parvec[9] ~ dgamma(1,.5)
+}
