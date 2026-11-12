@@ -101,7 +101,10 @@ year <- bugs_and_fish$year_type
 library(lavaan)
 
 data <- data.frame(flow, food.qual, diet.qual, fish.condish,
-                   year = factor(year_type))   # e.g. "wet" / "dry"
+                   year)   # e.g. "wet" / "dry"
+
+data <- data.frame(flow, food.qual, diet.qual, fish.condish,
+                   year = bugs_and_fish$year_type)
 
 # Check the group order lavaan will use (labels below must follow it)
 levels(data$year)
@@ -131,6 +134,23 @@ model_mg <- '
 
 fit_mg <- sem(model_mg, data = data, group = "year")
 summary(fit_mg, ci = TRUE)
+
+
+semPaths(fit_mg,
+         what = "est",            # show estimated coefficients on arrows
+         whatLabels = "est",
+         layout = "tree2",        # left-to-right chain; try "tree", "spring", "circle"
+         rotation = 2,            # 2 = left to right (default 1 is top to bottom)
+         edge.label.cex = 1.1,
+         sizeMan = 10,            # box size
+         style = "lisrel",
+         intercepts = FALSE,      # hides the intercept triangles, which clutter the plot
+         residuals = FALSE,       # hides the residual loops
+         nCharNodes = 0,          # don't abbreviate variable names
+         color = list(man = c("#008080", "#B4C8A8", "#EDBB8A", "#CA562C")),
+         edge.color = "gray30", fade = FALSE)
+
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 library(runjags)
