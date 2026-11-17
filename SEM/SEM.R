@@ -11,7 +11,10 @@ library(vioplot)
 install.packages("lavaan")
 library(lavaan)
 install.packages("piecewiseSEM")
-library(piecewiseSEM)
+library(piecewiseSEM) # can use for more flexibility in GLM, etc. but doesn't handle latent variables well
+# Could use a latent variable for habitat quality with didymo, flow, temp
+# Thomas also said a latent variable could be used for different scales of measuring same metric
+# e.g., benthotorch vs reach level measurement
 install.packages("blavaan")
 library(blavaan)
 install.packages("semPlot")   
@@ -20,10 +23,21 @@ library(semPlot)
 
 bugs_and_fish <- read.csv("bugs_and_fish_with_diets_Unsummed.csv")
 
-flow <- bugs_and_fish$Discharge_cfs
-food.qual <- bugs_and_fish$Percent.Scraper.Biomass
-diet.qual <- bugs_and_fish$Percent.Diet.Scraper.Biomass
-fish.condish <- bugs_and_fish$Wr
+hist(log(bugs_and_fish$Discharge_cfs))
+hist(bugs_and_fish$Discharge_cfs)
+
+hist(log(bugs_and_fish$Percent.Scraper.Biomass))
+hist(bugs_and_fish$Percent.Scraper.Biomass)
+
+hist(log(bugs_and_fish$Percent.Diet.Scraper.Biomass))
+hist(bugs_and_fish$Percent.Diet.Scraper.Biomass)
+
+hist(bugs_and_fish$Wr)
+
+flow <- scale(log(bugs_and_fish$Discharge_cfs))
+food.qual <- scale(log(bugs_and_fish$Percent.Scraper.Biomass))
+diet.qual <- as.numeric(scale(log(bugs_and_fish$Percent.Diet.Scraper.Biomass + 0.000001)))
+fish.condish <- scale(bugs_and_fish$Wr)
 
 # To write a path analysis we'll use 'lavaan', a package that allows for the construction of
 # structural equation models. Lavaan can obtain ML parameter estimates for path coefficients
@@ -32,9 +46,9 @@ fish.condish <- bugs_and_fish$Wr
 # data types, or 3) missing data.
 data <- data.frame(flow, food.qual, diet.qual, fish.condish)
 path1 <- sem(model =
-              'food.qual ~ 1 + a1 * flow  
-              diet.qual ~ 1 + b1 * food.qual
-              fish.condish ~ 1 + c1 * diet.qual
+              'food.qual ~ a1 * flow  # can take out "1 + a1..." as intercept since its z standardized and intercept is zero
+              diet.qual ~ b1 * food.qual
+              fish.condish ~ c1 * diet.qual
               
               foodxfish := b1 * c1 # indirect effect of fish on food
               fishxflow := a1 * b1 * c1', # indirect effect of flow on fish
@@ -49,8 +63,10 @@ summary(path1)
 # just may not be a strong predictor of body condition...body condition could be better explained from
 # temp or something else
 
+
 # no indirect effect of fish on food resources (e.g., there is a weak top-down effect)
 # no indirect effect of flow on fish body condition
+
 library(rcartocolor)
 display_carto_all()
 carto_pal(7, "Geyser")
@@ -68,13 +84,6 @@ semPaths(path1,
          nCharNodes = 0,          # don't abbreviate variable names
          color = list(man = c("#008080", "#B4C8A8", "#EDBB8A", "#CA562C")),
          edge.color = "gray30", fade = FALSE)
-
-
-# Now, let's explore blavaan!
-# note you can specify the number of chains, burn-in, even priors, but the real
-# value of this (from my perspective) is that it will spit out a working JAGS
-# or Stan model if you specify mcmcfile = T
-# https://rdrr.io/cran/blavaan/man/bsem.html
 
 # Running this again with wet vs dry yearp-------------------------------------------
 
@@ -152,7 +161,84 @@ semPaths(fit_mg,
 
 
 
+
+# Running this again with species-----------------------------------------------
+bugs_and_fish <- bugs_and_fish %>%
+  mutate(
+    Species.Type = case_when(
+      Species %in% c("MTS") ~ "MTS",
+      Species %in% c("BNT") ~ "BNT",
+      TRUE                                ~ NA_character_
+    ),
+    Species.Type = factor(Species, levels = c("MTS", "BNT"))
+  )
+
+
+flow <- bugs_and_fish$Discharge_cfs
+food.qual <- bugs_and_fish$Percent.Scraper.Biomass
+diet.qual <- bugs_and_fish$Percent.Diet.Scraper.Biomass
+fish.condish <- bugs_and_fish$Wr
+Species <- bugs_and_fish$Species.Type
+
+library(lavaan)
+
+data <- data.frame(flow, food.qual, diet.qual, fish.condish,
+                   Species)   # e.g. BNT/MTS
+
+
+# Check the group order lavaan will use (labels below must follow it)
+levels(data$Species)
+
+model_mg <- '
+  food.qual    ~ c(a1_MTS, a1_BNT) * flow
+  diet.qual    ~ c(b1_MTS, b1_BNT) * food.qual
+  fish.condish ~ c(c1_MTS, c1_BNT) * diet.qual
+
+  # intercepts per group
+  food.qual    ~ 1
+  diet.qual    ~ 1
+  fish.condish ~ 1
+
+  # indirect effects per group
+  foodxfish_MTS := b1_MTS * c1_MTS
+  foodxfish_BNT := b1_BNT * c1_BNT
+  flowxfish_MTS := a1_MTS * b1_MTS * c1_MTS
+  flowxfish_BNT := a1_BNT * b1_BNT * c1_BNT
+
+  # differences between groups
+  diff_a    := a1_BNT - a1_MTS
+  diff_b    := b1_BNT - b1_MTS
+  diff_c    := c1_BNT - c1_MTS
+  diff_flow := flowxfish_BNT - flowxfish_MTS
+'
+
+fit_mg <- sem(model_mg, data = data, group = "Species")
+summary(fit_mg, ci = TRUE)
+
+
+semPaths(fit_mg,
+         what = "est",            # show estimated coefficients on arrows
+         whatLabels = "est",
+         layout = "tree2",        # left-to-right chain; try "tree", "spring", "circle"
+         rotation = 2,            # 2 = left to right (default 1 is top to bottom)
+         edge.label.cex = 1.1,
+         sizeMan = 10,            # box size
+         style = "lisrel",
+         intercepts = FALSE,      # hides the intercept triangles, which clutter the plot
+         residuals = FALSE,       # hides the residual loops
+         nCharNodes = 0,          # don't abbreviate variable names
+         color = list(man = c("#008080", "#B4C8A8", "#EDBB8A", "#CA562C")),
+         edge.color = "gray30", fade = FALSE)
+
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Now, let's explore blavaan!
+# note you can specify the number of chains, burn-in, even priors, but the real
+# value of this (from my perspective) is that it will spit out a working JAGS
+# or Stan model if you specify mcmcfile = T
+# https://rdrr.io/cran/blavaan/man/bsem.html
+
 library(runjags)
 
 data <- data.frame(flow, food.qual, diet.qual, fish.condish)
