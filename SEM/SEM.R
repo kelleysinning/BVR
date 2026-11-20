@@ -123,11 +123,6 @@ model_mg <- '
   diet.qual    ~ c(b1_dry, b1_wet) * food.qual
   fish.condish ~ c(c1_dry, c1_wet) * diet.qual
 
-  # intercepts per group
-  food.qual    ~ 1
-  diet.qual    ~ 1
-  fish.condish ~ 1
-
   # indirect effects per group
   foodxfish_dry := b1_dry * c1_dry
   foodxfish_wet := b1_wet * c1_wet
